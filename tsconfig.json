@@ -15,7 +15,8 @@
     "outDir": "./dist",
     "rootDir": "./",
     "removeComments": false,
-    "noEmit": false,
+    "noEmit": true,
+    "composite": true,
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
@@ -40,7 +41,6 @@
     }
   },
   "include": [
-    "apps/**/*",
     "packages/**/*"
   ],
   "exclude": [

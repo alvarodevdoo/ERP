@@ -4,7 +4,7 @@ const configSchema = z.object({
   // Server
   PORT: z.string().default('3001').transform(Number),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  CORS_ORIGIN: z.string().default('http://localhost:5173').transform((val) => val.split(',')),
 
   // Database
   DATABASE_URL: z.string(),
