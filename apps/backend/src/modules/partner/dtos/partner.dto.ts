@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { PartnerType } from '@prisma/client';
+import { $Enums } from '@prisma/client';
+import type { PartnerType } from '@prisma/client';
 
 // Schema de validação para criação de parceiro
 export const createPartnerSchema = z.object({
@@ -7,7 +8,7 @@ export const createPartnerSchema = z.object({
   email: z.string().email('Email inválido').optional(),
   phone: z.string().optional(),
   document: z.string().optional(),
-  type: z.nativeEnum(PartnerType, { required_error: 'Tipo é obrigatório' }),
+  type: z.nativeEnum($Enums.PartnerType),
   // Campo status removido - não existe no schema
   notes: z.string().optional(),
   
@@ -36,14 +37,36 @@ export const createPartnerSchema = z.object({
 });
 
 // Schema de validação para atualização de parceiro
-export const updatePartnerSchema = createPartnerSchema.partial();
+export const updatePartnerSchema = z.object({
+  name: z.string().min(1, 'Nome é obrigatório').max(255, 'Nome deve ter no máximo 255 caracteres').optional(),
+  email: z.string().email('Email inválido').optional(),
+  phone: z.string().optional(),
+  document: z.string().optional(),
+  type: z.nativeEnum($Enums.PartnerType).optional(),
+  notes: z.string().optional(),
+  address: z.object({
+    street: z.string().optional(),
+    number: z.string().optional(),
+    complement: z.string().optional(),
+    neighborhood: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    zipCode: z.string().optional(),
+    country: z.string().optional()
+  }).optional(),
+  creditLimit: z.number().min(0, 'Limite de crédito deve ser positivo').optional(),
+  paymentTerms: z.string().optional(),
+  salesRepresentative: z.string().optional(),
+  discount: z.number().min(0, 'Desconto deve ser positivo').max(100, 'Desconto não pode ser maior que 100%').optional(),
+  metadata: z.record(z.string(), z.unknown()).optional()
+});
 
 // Schema de validação para filtros de busca
 export const partnerFiltersSchema = z.object({
   name: z.string().optional(),
   email: z.string().optional(),
   document: z.string().optional(),
-  type: z.nativeEnum(PartnerType).optional(),
+  type: z.nativeEnum($Enums.PartnerType).optional(),
   // Campo status removido - não existe no schema
   city: z.string().optional(),
   state: z.string().optional(),

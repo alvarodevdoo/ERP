@@ -2,7 +2,8 @@ import { PrismaClient as _PrismaClient, Prisma } from '@prisma/client';
 import {
   CreateEmployeeDto,
   UpdateEmployeeDto,
-  EmployeeFiltersDto
+  EmployeeFiltersDto,
+  EmployeeStatsDto
 } from '../dtos';
 import { prisma } from '../../../database/connection';
 
@@ -11,7 +12,11 @@ import { prisma } from '../../../database/connection';
  * Implementa padrão Repository para isolamento da camada de dados
  */
 export class EmployeeRepository {
-  constructor() {}
+  public prisma: _PrismaClient;
+
+  constructor(prismaClient?: _PrismaClient) {
+    this.prisma = prismaClient || prisma;
+  }
 
   /**
    * Cria um novo funcionário
@@ -648,5 +653,32 @@ export class EmployeeRepository {
         createdAt: 'asc'
       }
     });
+  }
+
+  /**
+   * Verifica se existe funcionário com o email informado na empresa
+   */
+  async emailExists(email: string, companyId: string, excludeId?: string): Promise<boolean> {
+    const employee = await prisma.employee.findFirst({
+      where: {
+        companyId,
+        user: {
+          email
+        },
+        ...(excludeId && { id: { not: excludeId } })
+      }
+    });
+    return !!employee;
+  }
+
+  /**
+   * Verifica se existe funcionário com o CPF informado na empresa
+   * Note: CPF field doesn't exist in Employee model, this method is kept for compatibility
+   * but will always return false
+   */
+  async cpfExists(cpf: string, companyId: string, excludeId?: string): Promise<boolean> {
+    // CPF field doesn't exist in the Employee model
+    // This method is kept for compatibility but always returns false
+    return false;
   }
 }

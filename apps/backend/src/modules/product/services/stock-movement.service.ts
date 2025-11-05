@@ -1,4 +1,5 @@
-import { PrismaClient, StockMovementType } from '@prisma/client';
+import { PrismaClient, $Enums } from '@prisma/client';
+import type { StockMovementType } from '@prisma/client';
 import {
   CreateStockMovementDto,
   StockMovementResponseDto
@@ -45,6 +46,7 @@ export class StockMovementService {
       throw new AppError('Produto não encontrado', 404);
     }
 
+    // 
     if (!product.trackStock) {
       throw new AppError('Produto não controla estoque', 400);
     }
@@ -67,6 +69,7 @@ export class StockMovementService {
     // Calcular custo total se não fornecido
     const movementData = {
       ...data,
+      // 
       totalCost: data.totalCost || (data.unitCost || 0) * data.quantity
     };
 
@@ -231,6 +234,7 @@ export class StockMovementService {
       type: 'IN',
       quantity,
       unitCost,
+      // 
       totalCost: unitCost * quantity,
       reason,
       reference
@@ -258,6 +262,7 @@ export class StockMovementService {
       type: 'OUT',
       quantity,
       unitCost,
+      // 
       totalCost: unitCost * quantity,
       reason,
       reference
@@ -284,6 +289,7 @@ export class StockMovementService {
       throw new AppError('Produto não encontrado', 404);
     }
 
+    // 
     if (!product.trackStock) {
       throw new AppError('Produto não controla estoque', 400);
     }
@@ -305,6 +311,7 @@ export class StockMovementService {
       type: 'ADJUSTMENT',
       quantity: adjustment,
       unitCost: product.costPrice || 0,
+      // 
       totalCost: (product.costPrice || 0) * Math.abs(adjustment),
       reason,
       reference: `AJUSTE-${Date.now()}`
@@ -342,6 +349,8 @@ export class StockMovementService {
       throw new AppError('Produto de destino não encontrado', 404);
     }
 
+    // 
+    // 
     if (!fromProduct.trackStock || !toProduct.trackStock) {
       throw new AppError('Ambos os produtos devem controlar estoque', 400);
     }
@@ -370,6 +379,7 @@ export class StockMovementService {
           type: 'OUT',
           quantity,
           unitCost,
+          // 
           totalCost: unitCost * quantity,
           reason: `${reason} - Transferência para ${toProduct.name}`,
           reference
@@ -383,6 +393,7 @@ export class StockMovementService {
           type: 'IN',
           quantity,
           unitCost,
+          // 
           totalCost: unitCost * quantity,
           reason: `${reason} - Transferência de ${fromProduct.name}`,
           reference
@@ -476,6 +487,8 @@ export class StockMovementService {
     }
 
     // Validar custo total
+    // 
+    // 
     if (data.totalCost !== undefined && data.totalCost < 0) {
       throw new AppError('Custo total não pode ser negativo', 400);
     }

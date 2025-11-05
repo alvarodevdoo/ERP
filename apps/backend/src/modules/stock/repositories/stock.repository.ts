@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import {
   StockMovementDTO,
   StockReservationDTO,
@@ -14,90 +14,91 @@ import {
   StockLocationResponseDTO,
   StockStatsDTO,
   StockReportDTO,
-  StockMovementReportDTO
+  StockMovementReportDTO,
 } from '../dtos';
 
 export class StockRepository {
   constructor(private prisma: PrismaClient) {}
 
-  /**
-   * Busca item de estoque por produto e localização
-   */
-  async findStockItem(productId: string, locationId?: string, companyId?: string): Promise<StockItemResponseDTO | null> {
+  async findStockItem(
+    productId: string,
+    locationId: string,
+    companyId: string,
+  ): Promise<StockItemResponseDTO | null> {
     const stockItem = await this.prisma.stockItem.findFirst({
       where: {
         productId,
         locationId,
         companyId,
-        deletedAt: null
+        deletedAt: null,
       },
       include: {
         product: {
           select: {
             name: true,
-            code: true,
-            category: true
-          }
+            sku: true,
+            category: true,
+          },
         },
         location: {
           select: {
-            name: true
-          }
+            name: true,
+          },
         },
         batches: {
           where: {
             quantity: { gt: 0 },
-            deletedAt: null
+            deletedAt: null,
           },
           orderBy: {
-            expirationDate: 'asc'
-          }
-        }
-      }
+            expirationDate: 'asc',
+          },
+        },
+      },
     });
 
-    if (!stockItem) return null;
+    if (!stockItem || !stockItem.product) return null;
 
     return {
       id: stockItem.id,
       productId: stockItem.productId,
       productName: stockItem.product.name,
-      productCode: stockItem.product.code,
-      productCategory: stockItem.product.category || '',
+      productCode: stockItem.product.sku,
+      productCategory: stockItem.product.category?.name ?? '',
       locationId: stockItem.locationId,
       locationName: stockItem.location?.name || null,
-      quantity: stockItem.quantity,
-      reservedQuantity: stockItem.reservedQuantity,
-      availableQuantity: stockItem.quantity - stockItem.reservedQuantity,
-      unitCost: stockItem.unitCost,
-      totalValue: stockItem.quantity * stockItem.unitCost,
+      quantity: stockItem.quantity.toNumber(),
+      reservedQuantity: stockItem.reservedQuantity.toNumber(),
+      availableQuantity: stockItem.quantity.minus(stockItem.reservedQuantity).toNumber(),
+      unitCost: stockItem.unitCost.toNumber(),
+      totalValue: stockItem.quantity.mul(stockItem.unitCost).toNumber(),
       minStock: stockItem.minStock,
       maxStock: stockItem.maxStock,
-      isLowStock: stockItem.quantity <= stockItem.minStock,
-      isOutOfStock: stockItem.quantity <= 0,
+      isLowStock: stockItem.quantity.lte(stockItem.minStock),
+      isOutOfStock: stockItem.quantity.lte(0),
       lastMovementAt: stockItem.lastMovementAt?.toISOString() || null,
       lastMovementType: stockItem.lastMovementType,
-      batches: stockItem.batches.map(batch => ({
+      batches: stockItem.batches.map((batch: any) => ({
         id: batch.id,
         batchNumber: batch.batchNumber,
-        quantity: batch.quantity,
-        unitCost: batch.unitCost,
+        quantity: batch.quantity.toNumber(),
+        unitCost: batch.unitCost.toNumber(),
         expirationDate: batch.expirationDate?.toISOString() || null,
         isExpired: batch.expirationDate ? batch.expirationDate < new Date() : false,
-        createdAt: batch.createdAt.toISOString()
+        createdAt: batch.createdAt.toISOString(),
       })),
       createdAt: stockItem.createdAt.toISOString(),
-      updatedAt: stockItem.updatedAt.toISOString()
+      updatedAt: stockItem.updatedAt.toISOString(),
     };
   }
 
-  /**
-   * Lista itens de estoque com filtros
-   */
-  async findMany(filters: StockFiltersDTO, companyId: string): Promise<{ items: StockItemResponseDTO[]; total: number }> {
-    const where: Record<string, unknown> = {
+  async findMany(
+    filters: StockFiltersDTO,
+    companyId: string,
+  ): Promise<{ items: StockItemResponseDTO[]; total: number }> {
+    const where: Prisma.StockItemWhereInput = {
       companyId,
-      deletedAt: null
+      deletedAt: null,
     };
 
     if (filters.productId) {
@@ -109,11 +110,14 @@ export class StockRepository {
     }
 
     if (filters.category) {
+      // Filtrar pelo nome da categoria relacionada (ProductCategory)
       where.product = {
         category: {
-          contains: filters.category,
-          mode: 'insensitive'
-        }
+          name: {
+            contains: filters.category,
+            mode: 'insensitive',
+          },
+        },
       };
     }
 
@@ -123,32 +127,46 @@ export class StockRepository {
           product: {
             name: {
               contains: filters.search,
-              mode: 'insensitive'
-            }
-          }
+              mode: 'insensitive',
+            },
+          },
         },
         {
           product: {
-            code: {
+            sku: {
               contains: filters.search,
-              mode: 'insensitive'
-            }
-          }
-        }
+              mode: 'insensitive',
+            },
+          },
+        },
       ];
     }
 
     if (filters.lowStock) {
       where.quantity = {
-        lte: this.prisma.stockItem.fields.minStock
+        lte: 10, // threshold padrão para estoque baixo
       };
     }
 
     if (filters.outOfStock) {
       where.quantity = {
-        lte: 0
+        lte: 0,
       };
     }
+
+    const orderBy: Prisma.StockItemOrderByWithRelationInput = (() => {
+      const sortOrder = filters.sortOrder;
+      switch (filters.sortBy) {
+        case 'quantity':
+          return { quantity: sortOrder };
+        case 'unitCost':
+          return { unitCost: sortOrder };
+        case 'productName':
+          return { product: { name: sortOrder } };
+        default:
+          return { createdAt: 'desc' };
+      }
+    })();
 
     const [items, total] = await Promise.all([
       this.prisma.stockItem.findMany({
@@ -157,162 +175,160 @@ export class StockRepository {
           product: {
             select: {
               name: true,
-              code: true,
-              category: true
-            }
+              sku: true,
+              category: { select: { name: true } },
+            },
           },
           location: {
             select: {
-              name: true
-            }
+              name: true,
+            },
           },
           batches: {
             where: {
               quantity: { gt: 0 },
-              deletedAt: null
+              deletedAt: null,
             },
             orderBy: {
-              expirationDate: 'asc'
-            }
-          }
+              expirationDate: 'asc',
+            },
+          },
         },
-        orderBy: {
-          [filters.sortBy]: filters.sortOrder
-        },
+        orderBy,
         skip: (filters.page - 1) * filters.limit,
-        take: filters.limit
+        take: filters.limit,
       }),
-      this.prisma.stockItem.count({ where })
+      this.prisma.stockItem.count({ where }),
     ]);
 
     return {
-      items: items.map(item => ({
-        id: item.id,
-        productId: item.productId,
-        productName: item.product.name,
-        productCode: item.product.code,
-        productCategory: item.product.category || '',
-        locationId: item.locationId,
-        locationName: item.location?.name || null,
-        quantity: item.quantity,
-        reservedQuantity: item.reservedQuantity,
-        availableQuantity: item.quantity - item.reservedQuantity,
-        unitCost: item.unitCost,
-        totalValue: item.quantity * item.unitCost,
-        minStock: item.minStock,
-        maxStock: item.maxStock,
-        isLowStock: item.quantity <= item.minStock,
-        isOutOfStock: item.quantity <= 0,
-        lastMovementAt: item.lastMovementAt?.toISOString() || null,
-        lastMovementType: item.lastMovementType,
-        batches: item.batches.map(batch => ({
-          id: batch.id,
-          batchNumber: batch.batchNumber,
-          quantity: batch.quantity,
-          unitCost: batch.unitCost,
-          expirationDate: batch.expirationDate?.toISOString() || null,
-          isExpired: batch.expirationDate ? batch.expirationDate < new Date() : false,
-          createdAt: batch.createdAt.toISOString()
+      items: items
+        .filter((item): item is typeof item & { product: NonNullable<typeof item.product> } => !!item.product)
+        .map((item) => ({
+          id: item.id,
+          productId: item.productId,
+          productName: item.product.name,
+          productCode: item.product.sku,
+          productCategory: item.product.category?.name ?? '',
+          locationId: item.locationId,
+          locationName: item.location?.name || null,
+          quantity: item.quantity.toNumber(),
+          reservedQuantity: item.reservedQuantity.toNumber(),
+          availableQuantity: item.quantity.minus(item.reservedQuantity).toNumber(),
+          unitCost: item.unitCost.toNumber(),
+          totalValue: item.quantity.mul(item.unitCost).toNumber(),
+          minStock: item.minStock,
+          maxStock: item.maxStock,
+          isLowStock: item.quantity.lte(item.minStock),
+          isOutOfStock: item.quantity.lte(0),
+          lastMovementAt: item.lastMovementAt?.toISOString() || null,
+          lastMovementType: item.lastMovementType,
+          batches: item.batches.map((batch: any) => ({
+            id: batch.id,
+            batchNumber: batch.batchNumber,
+            quantity: batch.quantity.toNumber(),
+            unitCost: batch.unitCost.toNumber(),
+            expirationDate: batch.expirationDate?.toISOString() || null,
+            isExpired: batch.expirationDate ? batch.expirationDate < new Date() : false,
+            createdAt: batch.createdAt.toISOString(),
+          })),
+          createdAt: item.createdAt.toISOString(),
+          updatedAt: item.updatedAt.toISOString(),
         })),
-        createdAt: item.createdAt.toISOString(),
-        updatedAt: item.updatedAt.toISOString()
-      })),
-      total
+      total,
     };
   }
 
-  /**
-   * Registra movimentação de estoque
-   */
-  async createMovement(data: StockMovementDTO, userId: string, companyId: string): Promise<StockMovementResponseDTO> {
+  async createMovement(
+    data: StockMovementDTO,
+    userId: string,
+    companyId: string,
+  ): Promise<StockMovementResponseDTO> {
+    const totalCost = data.unitCost ? new Prisma.Decimal(data.quantity).mul(data.unitCost) : null;
+
     const movement = await this.prisma.stockMovement.create({
       data: {
         ...data,
         userId,
         companyId,
-        totalCost: data.unitCost ? data.quantity * data.unitCost : null
+        totalCost,
       },
       include: {
         product: {
           select: {
             name: true,
-            code: true
-          }
+            sku: true,
+          },
         },
-        location: {
+        fromLocation: {
           select: {
-            name: true
-          }
+            name: true,
+          },
         },
-        destinationLocation: {
+        toLocation: {
           select: {
-            name: true
-          }
+            name: true,
+          },
         },
         user: {
           select: {
-            name: true
-          }
-        }
-      }
+            name: true,
+          },
+        },
+      },
     });
 
     return {
       id: movement.id,
       productId: movement.productId,
-      productName: movement.product.name,
-      productCode: movement.product.code,
+      productName: movement.product?.name || null,
+      productCode: movement.product?.sku || null,
       type: movement.type as 'IN' | 'OUT' | 'ADJUSTMENT' | 'TRANSFER',
-      quantity: movement.quantity,
-      unitCost: movement.unitCost,
-      totalCost: movement.totalCost,
+      quantity: movement.quantity.toNumber(),
+      unitCost: movement.unitCost?.toNumber() || null,
+      totalCost: movement.totalCost?.toNumber() || null,
       reason: movement.reason,
       reference: movement.reference,
-      locationId: movement.locationId,
-      locationName: movement.location?.name || null,
-      destinationLocationId: movement.destinationLocationId,
-      destinationLocationName: movement.destinationLocation?.name || null,
-      batchNumber: movement.batchNumber,
-      expirationDate: movement.expirationDate?.toISOString() || null,
+      locationId: movement.fromLocationId,
+      locationName: movement.fromLocation?.name || null,
+      destinationLocationId: movement.toLocationId,
+      destinationLocationName: movement.toLocation?.name || null,
       notes: movement.notes,
       userId: movement.userId,
       userName: movement.user.name,
-      createdAt: movement.createdAt.toISOString()
+      createdAt: movement.createdAt.toISOString(),
+      batchNumber: null, // Add missing properties
+      expirationDate: null, // Add missing properties
     };
   }
 
-  /**
-   * Atualiza quantidade em estoque
-   */
   async updateStockQuantity(
     productId: string,
-    locationId: string | null,
+    locationId: string,
     quantityChange: number,
     unitCost?: number,
-    companyId?: string
+    companyId?: string,
   ): Promise<void> {
     const stockItem = await this.prisma.stockItem.findFirst({
       where: {
         productId,
         locationId,
         companyId,
-        deletedAt: null
-      }
+        deletedAt: null,
+      },
     });
 
     if (stockItem) {
-      // Atualiza item existente
       await this.prisma.stockItem.update({
         where: { id: stockItem.id },
         data: {
-          quantity: stockItem.quantity + quantityChange,
+          quantity: stockItem.quantity.add(quantityChange),
           unitCost: unitCost || stockItem.unitCost,
           lastMovementAt: new Date(),
-          lastMovementType: quantityChange > 0 ? 'IN' : 'OUT'
-        }
+          lastMovementType: quantityChange > 0 ? 'IN' : 'OUT',
+        },
       });
     } else if (quantityChange > 0) {
-      // Cria novo item de estoque apenas para entradas
       await this.prisma.stockItem.create({
         data: {
           productId,
@@ -324,19 +340,19 @@ export class StockRepository {
           minStock: 0,
           maxStock: 0,
           lastMovementAt: new Date(),
-          lastMovementType: 'IN'
-        }
+          lastMovementType: 'IN',
+        },
       });
     }
   }
 
-  /**
-   * Lista movimentações de estoque
-   */
-  async findMovements(filters: StockMovementFiltersDTO, companyId: string): Promise<{ items: StockMovementResponseDTO[]; total: number }> {
-    const where: Record<string, unknown> = {
+  async findMovements(
+    filters: StockMovementFiltersDTO,
+    companyId: string,
+  ): Promise<{ items: StockMovementResponseDTO[]; total: number }> {
+    const where: Prisma.StockMovementWhereInput = {
       companyId,
-      deletedAt: null
+      deletedAt: null,
     };
 
     if (filters.productId) {
@@ -348,7 +364,7 @@ export class StockRepository {
     }
 
     if (filters.locationId) {
-      where.locationId = filters.locationId;
+      where.fromLocationId = filters.locationId;
     }
 
     if (filters.userId) {
@@ -358,19 +374,32 @@ export class StockRepository {
     if (filters.reference) {
       where.reference = {
         contains: filters.reference,
-        mode: 'insensitive'
+        mode: 'insensitive',
       };
     }
 
     if (filters.startDate || filters.endDate) {
-      where.createdAt = {};
-      if (filters.startDate) {
-        where.createdAt.gte = new Date(filters.startDate);
-      }
-      if (filters.endDate) {
-        where.createdAt.lte = new Date(filters.endDate);
-      }
+      where.createdAt = {
+        ...(filters.startDate ? { gte: new Date(filters.startDate) } : {}),
+        ...(filters.endDate ? { lte: new Date(filters.endDate) } : {}),
+      };
     }
+
+    const orderBy: Prisma.StockMovementOrderByWithRelationInput = (() => {
+      const sortOrder = filters.sortOrder;
+      switch (filters.sortBy) {
+        case 'quantity':
+          return { quantity: sortOrder };
+        case 'unitCost':
+          return { unitCost: sortOrder };
+        case 'type':
+          return { type: sortOrder };
+        case 'createdAt':
+          return { createdAt: sortOrder };
+        default:
+          return { createdAt: 'desc' };
+      }
+    })();
 
     const [items, total] = await Promise.all([
       this.prisma.stockMovement.findMany({
@@ -379,219 +408,219 @@ export class StockRepository {
           product: {
             select: {
               name: true,
-              code: true
-            }
+              sku: true,
+            },
           },
-          location: {
+          fromLocation: {
             select: {
-              name: true
-            }
+              name: true,
+            },
           },
-          destinationLocation: {
+          toLocation: {
             select: {
-              name: true
-            }
+              name: true,
+            },
           },
           user: {
             select: {
-              name: true
-            }
-          }
+              name: true,
+            },
+          },
         },
-        orderBy: {
-          [filters.sortBy]: filters.sortOrder
-        },
+        orderBy,
         skip: (filters.page - 1) * filters.limit,
-        take: filters.limit
+        take: filters.limit,
       }),
-      this.prisma.stockMovement.count({ where })
+      this.prisma.stockMovement.count({ where }),
     ]);
 
     return {
-      items: items.map(item => ({
+      items: items.map((item: any) => ({
         id: item.id,
         productId: item.productId,
-        productName: item.product.name,
-        productCode: item.product.code,
+        productName: item.product?.name || null,
+        productCode: item.product?.sku || null,
         type: item.type as 'IN' | 'OUT' | 'ADJUSTMENT' | 'TRANSFER',
-        quantity: item.quantity,
-        unitCost: item.unitCost,
-        totalCost: item.totalCost,
+        quantity: item.quantity.toNumber(),
+        unitCost: item.unitCost?.toNumber() || null,
+        totalCost: item.totalCost?.toNumber() || null,
         reason: item.reason,
         reference: item.reference,
-        locationId: item.locationId,
-        locationName: item.location?.name || null,
-        destinationLocationId: item.destinationLocationId,
-        destinationLocationName: item.destinationLocation?.name || null,
-        batchNumber: item.batchNumber,
-        expirationDate: item.expirationDate?.toISOString() || null,
+        locationId: item.fromLocationId,
+        locationName: item.fromLocation?.name || null,
+        destinationLocationId: item.toLocationId,
+        destinationLocationName: item.toLocation?.name || null,
         notes: item.notes,
         userId: item.userId,
         userName: item.user.name,
-        createdAt: item.createdAt.toISOString()
+        createdAt: item.createdAt.toISOString(),
+        batchNumber: null, // Add missing properties
+        expirationDate: null, // Add missing properties
       })),
-      total
+      total,
     };
   }
 
-  /**
-   * Cria reserva de estoque
-   */
-  async createReservation(data: StockReservationDTO, userId: string, companyId: string): Promise<StockReservationResponseDTO> {
+  async createReservation(
+    data: StockReservationDTO,
+    userId: string,
+    companyId: string,
+  ): Promise<StockReservationResponseDTO> {
     const reservation = await this.prisma.stockReservation.create({
       data: {
-        ...data,
         userId,
         companyId,
         status: 'ACTIVE',
-        expiresAt: data.expiresAt ? new Date(data.expiresAt) : null
+        expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+        productId: data.productId,
+        quantity: data.quantity,
+        notes: data.reason,
+        locationId: data.locationId!,
+        orderId: data.referenceType === 'ORDER' ? data.referenceId : undefined,
+        quoteId: data.referenceType === 'QUOTE' ? data.referenceId : undefined,
       },
       include: {
         product: {
           select: {
             name: true,
-            code: true
-          }
+            sku: true,
+          },
         },
         location: {
           select: {
-            name: true
-          }
+            name: true,
+          },
         },
         user: {
           select: {
-            name: true
-          }
-        }
-      }
+            name: true,
+          },
+        },
+      },
     });
+
+    if (!reservation.product || !reservation.location || !reservation.user) throw new Error('Product, Location, or User not found');
 
     return {
       id: reservation.id,
       productId: reservation.productId,
       productName: reservation.product.name,
-      productCode: reservation.product.code,
-      quantity: reservation.quantity,
-      reason: reservation.reason,
-      referenceId: reservation.referenceId,
-      referenceType: reservation.referenceType as 'QUOTE' | 'ORDER' | 'OTHER' | null,
+      productCode: reservation.product.sku,
+      quantity: reservation.quantity.toNumber(),
       status: reservation.status as 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'FULFILLED',
       expiresAt: reservation.expiresAt?.toISOString() || null,
       locationId: reservation.locationId,
-      locationName: reservation.location?.name || null,
+      locationName: reservation.location.name,
       notes: reservation.notes,
       userId: reservation.userId,
       userName: reservation.user.name,
       createdAt: reservation.createdAt.toISOString(),
-      updatedAt: reservation.updatedAt.toISOString()
+      updatedAt: reservation.updatedAt.toISOString(),
+      reason: reservation.notes, // Map notes back to reason
+      referenceId: reservation.orderId || reservation.quoteId || null,
+      referenceType: reservation.orderId ? 'ORDER' : reservation.quoteId ? 'QUOTE' : 'OTHER',
     };
   }
 
-  /**
-   * Atualiza quantidade reservada no estoque
-   */
   async updateReservedQuantity(
     productId: string,
-    locationId: string | null,
+    locationId: string,
     quantityChange: number,
-    companyId: string
+    companyId: string,
   ): Promise<void> {
     const stockItem = await this.prisma.stockItem.findFirst({
       where: {
         productId,
         locationId,
         companyId,
-        deletedAt: null
-      }
+        deletedAt: null,
+      },
     });
 
     if (stockItem) {
       await this.prisma.stockItem.update({
         where: { id: stockItem.id },
         data: {
-          reservedQuantity: Math.max(0, stockItem.reservedQuantity + quantityChange)
-        }
+          reservedQuantity: stockItem.reservedQuantity.add(quantityChange),
+        },
       });
     }
   }
 
-  /**
-   * Busca reserva por ID
-   */
-  async findReservationById(id: string, companyId: string): Promise<StockReservationResponseDTO | null> {
+  async findReservationById(
+    id: string,
+    companyId: string,
+  ): Promise<StockReservationResponseDTO | null> {
     const reservation = await this.prisma.stockReservation.findFirst({
       where: {
         id,
         companyId,
-        deletedAt: null
+        deletedAt: null,
       },
       include: {
         product: {
           select: {
             name: true,
-            code: true
-          }
+            sku: true,
+          },
         },
         location: {
           select: {
-            name: true
-          }
+            name: true,
+          },
         },
         user: {
           select: {
-            name: true
-          }
-        }
-      }
+            name: true,
+          },
+        },
+      },
     });
 
-    if (!reservation) return null;
+    if (!reservation || !reservation.product || !reservation.location || !reservation.user) return null;
 
     return {
       id: reservation.id,
       productId: reservation.productId,
       productName: reservation.product.name,
-      productCode: reservation.product.code,
-      quantity: reservation.quantity,
-      reason: reservation.reason,
-      referenceId: reservation.referenceId,
-      referenceType: reservation.referenceType as 'QUOTE' | 'ORDER' | 'OTHER' | null,
+      productCode: reservation.product.sku,
+      quantity: reservation.quantity.toNumber(),
       status: reservation.status as 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'FULFILLED',
       expiresAt: reservation.expiresAt?.toISOString() || null,
       locationId: reservation.locationId,
-      locationName: reservation.location?.name || null,
+      locationName: reservation.location.name,
       notes: reservation.notes,
       userId: reservation.userId,
       userName: reservation.user.name,
       createdAt: reservation.createdAt.toISOString(),
-      updatedAt: reservation.updatedAt.toISOString()
+      updatedAt: reservation.updatedAt.toISOString(),
+      reason: reservation.notes, // Map notes back to reason
+      referenceId: reservation.orderId || reservation.quoteId || null,
+      referenceType: reservation.orderId ? 'ORDER' : reservation.quoteId ? 'QUOTE' : 'OTHER',
     };
   }
 
-  /**
-   * Cancela reserva de estoque
-   */
   async cancelReservation(id: string, data: CancelStockReservationDTO, companyId: string): Promise<void> {
     await this.prisma.stockReservation.update({
       where: {
         id,
-        companyId
+        companyId,
       },
       data: {
         status: 'CANCELLED',
         notes: data.notes || null,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
   }
 
-  /**
-   * Lista reservas de estoque
-   */
-  async findReservations(filters: StockReservationFiltersDTO, companyId: string): Promise<{ items: StockReservationResponseDTO[]; total: number }> {
-    const where: Record<string, unknown> = {
+  async findReservations(
+    filters: StockReservationFiltersDTO,
+    companyId: string,
+  ): Promise<{ items: StockReservationResponseDTO[]; total: number }> {
+    const where: Prisma.StockReservationWhereInput = {
       companyId,
-      deletedAt: null
+      deletedAt: null,
     };
 
     if (filters.productId) {
@@ -602,27 +631,30 @@ export class StockRepository {
       where.status = filters.status;
     }
 
-    if (filters.referenceType) {
-      where.referenceType = filters.referenceType;
-    }
-
-    if (filters.referenceId) {
-      where.referenceId = filters.referenceId;
-    }
-
     if (filters.locationId) {
       where.locationId = filters.locationId;
     }
 
     if (filters.startDate || filters.endDate) {
-      where.createdAt = {};
-      if (filters.startDate) {
-        where.createdAt.gte = new Date(filters.startDate);
-      }
-      if (filters.endDate) {
-        where.createdAt.lte = new Date(filters.endDate);
-      }
+      where.createdAt = {
+        ...(filters.startDate ? { gte: new Date(filters.startDate) } : {}),
+        ...(filters.endDate ? { lte: new Date(filters.endDate) } : {}),
+      };
     }
+
+    const orderBy: Prisma.StockReservationOrderByWithRelationInput = (() => {
+      const sortOrder = filters.sortOrder;
+      switch (filters.sortBy) {
+        case 'quantity':
+          return { quantity: sortOrder };
+        case 'expiresAt':
+          return { expiresAt: sortOrder };
+        case 'createdAt':
+          return { createdAt: sortOrder };
+        default:
+          return { createdAt: 'desc' };
+      }
+    })();
 
     const [items, total] = await Promise.all([
       this.prisma.stockReservation.findMany({
@@ -631,39 +663,34 @@ export class StockRepository {
           product: {
             select: {
               name: true,
-              code: true
-            }
+              sku: true,
+            },
           },
           location: {
             select: {
-              name: true
-            }
+              name: true,
+            },
           },
           user: {
             select: {
-              name: true
-            }
-          }
+              name: true,
+            },
+          },
         },
-        orderBy: {
-          [filters.sortBy]: filters.sortOrder
-        },
+        orderBy,
         skip: (filters.page - 1) * filters.limit,
-        take: filters.limit
+        take: filters.limit,
       }),
-      this.prisma.stockReservation.count({ where })
+      this.prisma.stockReservation.count({ where }),
     ]);
 
     return {
-      items: items.map(item => ({
+      items: items.map((item: any) => ({
         id: item.id,
         productId: item.productId,
         productName: item.product.name,
-        productCode: item.product.code,
-        quantity: item.quantity,
-        reason: item.reason,
-        referenceId: item.referenceId,
-        referenceType: item.referenceType as 'QUOTE' | 'ORDER' | 'OTHER' | null,
+        productCode: item.product.sku,
+        quantity: item.quantity.toNumber(),
         status: item.status as 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'FULFILLED',
         expiresAt: item.expiresAt?.toISOString() || null,
         locationId: item.locationId,
@@ -672,21 +699,24 @@ export class StockRepository {
         userId: item.userId,
         userName: item.user.name,
         createdAt: item.createdAt.toISOString(),
-        updatedAt: item.updatedAt.toISOString()
+        updatedAt: item.updatedAt.toISOString(),
+        reason: item.notes, // Map notes back to reason
+        referenceId: item.orderId || item.quoteId || null,
+        referenceType: item.orderId ? 'ORDER' : item.quoteId ? 'QUOTE' : 'OTHER',
       })),
-      total
+      total,
     };
   }
 
-  /**
-   * Cria localização de estoque
-   */
-  async createLocation(data: CreateStockLocationDTO, companyId: string): Promise<StockLocationResponseDTO> {
+  async createLocation(
+    data: CreateStockLocationDTO,
+    companyId: string,
+  ): Promise<StockLocationResponseDTO> {
     const location = await this.prisma.stockLocation.create({
       data: {
         ...data,
-        companyId
-      }
+        companyId,
+      },
     });
 
     return {
@@ -700,47 +730,40 @@ export class StockRepository {
       totalProducts: 0,
       totalValue: 0,
       createdAt: location.createdAt.toISOString(),
-      updatedAt: location.updatedAt.toISOString()
+      updatedAt: location.updatedAt.toISOString(),
     };
   }
 
-  /**
-   * Busca localização por ID
-   */
   async findLocationById(id: string, companyId: string): Promise<StockLocationResponseDTO | null> {
     const location = await this.prisma.stockLocation.findFirst({
       where: {
         id,
         companyId,
-        deletedAt: null
+        deletedAt: null,
       },
       include: {
         _count: {
           select: {
-            stockItems: {
-              where: {
-                deletedAt: null
-              }
-            }
-          }
+            stockItems: true,
+          },
         },
         stockItems: {
           where: {
-            deletedAt: null
+            deletedAt: null,
           },
           select: {
             quantity: true,
-            unitCost: true
-          }
-        }
-      }
+            unitCost: true,
+          },
+        },
+      },
     });
 
     if (!location) return null;
 
     const totalValue = location.stockItems.reduce(
-      (sum, item) => sum + (item.quantity * item.unitCost),
-      0
+      (sum, item) => sum + item.quantity.mul(item.unitCost).toNumber(),
+      0,
     );
 
     return {
@@ -754,48 +777,49 @@ export class StockRepository {
       totalProducts: location._count.stockItems,
       totalValue,
       createdAt: location.createdAt.toISOString(),
-      updatedAt: location.updatedAt.toISOString()
+      updatedAt: location.updatedAt.toISOString(),
     };
   }
 
-  /**
-   * Atualiza localização
-   */
-  async updateLocation(id: string, data: UpdateStockLocationDTO, companyId: string): Promise<StockLocationResponseDTO> {
+  async updateLocation(
+    id: string,
+    data: UpdateStockLocationDTO,
+    companyId: string,
+  ): Promise<StockLocationResponseDTO> {
     const location = await this.prisma.stockLocation.update({
       where: {
         id,
-        companyId
+        companyId,
       },
       data: {
         ...data,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       include: {
         _count: {
           select: {
             stockItems: {
               where: {
-                deletedAt: null
-              }
-            }
-          }
+                deletedAt: null,
+              },
+            },
+          },
         },
         stockItems: {
           where: {
-            deletedAt: null
+            deletedAt: null,
           },
           select: {
             quantity: true,
-            unitCost: true
-          }
-        }
-      }
+            unitCost: true,
+          },
+        },
+      },
     });
 
     const totalValue = location.stockItems.reduce(
-      (sum, item) => sum + (item.quantity * item.unitCost),
-      0
+      (sum, item) => sum + item.quantity.mul(item.unitCost).toNumber(),
+      0,
     );
 
     return {
@@ -809,185 +833,178 @@ export class StockRepository {
       totalProducts: location._count.stockItems,
       totalValue,
       createdAt: location.createdAt.toISOString(),
-      updatedAt: location.updatedAt.toISOString()
+      updatedAt: location.updatedAt.toISOString(),
     };
   }
 
-  /**
-   * Remove localização (soft delete)
-   */
   async deleteLocation(id: string, companyId: string): Promise<void> {
     await this.prisma.stockLocation.update({
       where: {
         id,
-        companyId
+        companyId,
       },
       data: {
-        deletedAt: new Date()
-      }
+        deletedAt: new Date(),
+      },
     });
   }
 
-  /**
-   * Obtém estatísticas do estoque
-   */
   async getStats(companyId: string): Promise<StockStatsDTO> {
     const [stockItems, movements, reservations] = await Promise.all([
       this.prisma.stockItem.findMany({
         where: {
           companyId,
-          deletedAt: null
+          deletedAt: null,
         },
         include: {
           product: {
             select: {
-              name: true
-            }
+              name: true,
+            },
           },
           location: {
             select: {
-              name: true
-            }
-          }
-        }
+              name: true,
+            },
+          },
+        },
       }),
       this.prisma.stockMovement.count({
         where: {
           companyId,
-          deletedAt: null
-        }
+          deletedAt: null,
+        },
       }),
       this.prisma.stockReservation.count({
         where: {
           companyId,
           status: 'ACTIVE',
-          deletedAt: null
-        }
-      })
+          deletedAt: null,
+        },
+      }),
     ]);
 
     const totalProducts = stockItems.length;
-    const totalValue = stockItems.reduce((sum, item) => sum + (item.quantity * item.unitCost), 0);
-    const lowStockProducts = stockItems.filter(item => item.quantity <= item.minStock).length;
-    const outOfStockProducts = stockItems.filter(item => item.quantity <= 0).length;
+    const totalValue = stockItems.reduce((sum, item) => 
+      sum + item.quantity.mul(item.unitCost).toNumber(), 0);
+    const lowStockProducts = stockItems.filter((item) => item.quantity.lte(item.minStock)).length;
+    const outOfStockProducts = stockItems.filter((item) => item.quantity.lte(0)).length;
 
-    // Top produtos por valor
     const topProducts = stockItems
-      .map(item => ({
+      .map((item: any) => ({
         productId: item.productId,
         productName: item.product.name,
-        quantity: item.quantity,
-        value: item.quantity * item.unitCost
+        quantity: item.quantity.toNumber(),
+        value: item.quantity.mul(item.unitCost).toNumber(),
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
 
-    // Valor por localização
-    const valueByLocation = stockItems.reduce((acc, item) => {
-      const locationId = item.locationId;
-      const locationName = item.location?.name || null;
-      const key = locationId || 'null';
-      
-      if (!acc[key]) {
-        acc[key] = {
-          locationId,
-          locationName,
-          totalValue: 0,
-          totalProducts: 0
-        };
-      }
-      
-      acc[key].totalValue += item.quantity * item.unitCost;
-      acc[key].totalProducts += 1;
-      
-      return acc;
-    }, {} as Record<string, { locationId: string | null; locationName: string | null; totalValue: number; totalProducts: number }>);
-
-    return {
-      totalProducts,
-      totalValue,
-      lowStockProducts,
-      outOfStockProducts,
-      totalMovements: movements,
-      totalReservations: reservations,
-      expiredBatches: 0, // TODO: Implementar contagem de lotes vencidos
-      topProducts,
-      movementsByType: [], // TODO: Implementar agrupamento por tipo
-      valueByLocation: Object.values(valueByLocation)
-    };
+      const valueByLocation = stockItems.reduce<Record<string, {
+        locationId: string | null;
+        locationName: string | null;
+        totalValue: number;
+        totalProducts: number;
+      }>>((acc, item) => {
+        const locationId = item.locationId;
+        const locationName = item.location?.name || null;
+        const key = locationId || 'null';
+        
+        if (!acc[key]) {
+          acc[key] = {
+            locationId,
+            locationName,
+            totalValue: 0,
+            totalProducts: 0
+          };
+        }
+        
+        acc[key].totalValue += item.quantity.mul(item.unitCost).toNumber();
+        acc[key].totalProducts += 1;
+        
+        return acc;
+      }, {} as Record<string, { locationId: string | null; locationName: string | null; totalValue: number; totalProducts: number }>);
+  
+      return {
+        totalProducts,
+        totalValue,
+        lowStockProducts,
+        outOfStockProducts,
+        totalMovements: movements,
+        totalReservations: reservations,
+        expiredBatches: 0, // TODO: Implementar contagem de lotes vencidos
+        topProducts,
+        movementsByType: [], // TODO: Implementar agrupamento por tipo
+        valueByLocation: Object.values(valueByLocation)
+      };
   }
 
-  /**
-   * Gera relatório de estoque
-   */
   async findForReport(companyId: string): Promise<StockReportDTO[]> {
     const stockItems = await this.prisma.stockItem.findMany({
       where: {
         companyId,
-        deletedAt: null
+        deletedAt: null,
       },
       include: {
         product: {
           select: {
             name: true,
-            code: true,
-            category: true
-          }
+            sku: true,
+            category: true,
+          },
         },
         location: {
           select: {
-            name: true
-          }
+            name: true,
+          },
         },
         batches: {
           where: {
-            deletedAt: null
-          }
-        }
-      }
+            deletedAt: null,
+          },
+        },
+      },
     });
 
-    return stockItems.map(item => ({
+    return stockItems.map((item: any) => ({
       productId: item.productId,
       productName: item.product.name,
-      productCode: item.product.code,
+      productCode: item.product.sku,
       productCategory: item.product.category || '',
       locationName: item.location?.name || null,
-      quantity: item.quantity,
-      reservedQuantity: item.reservedQuantity,
-      availableQuantity: item.quantity - item.reservedQuantity,
-      unitCost: item.unitCost,
-      totalValue: item.quantity * item.unitCost,
+      quantity: item.quantity.toNumber(),
+      reservedQuantity: item.reservedQuantity.toNumber(),
+      availableQuantity: item.quantity.minus(item.reservedQuantity).toNumber(),
+      unitCost: item.unitCost.toNumber(),
+      totalValue: item.quantity.mul(item.unitCost).toNumber(),
       minStock: item.minStock,
       maxStock: item.maxStock,
-      isLowStock: item.quantity <= item.minStock,
-      isOutOfStock: item.quantity <= 0,
+      isLowStock: item.quantity.lte(item.minStock),
+      isOutOfStock: item.quantity.lte(0),
       lastMovementAt: item.lastMovementAt?.toISOString() || null,
       lastMovementType: item.lastMovementType,
       batchesCount: item.batches.length,
-      expiredBatchesCount: item.batches.filter(batch => 
-        batch.expirationDate && batch.expirationDate < new Date()
-      ).length
+      expiredBatchesCount: item.batches.filter(
+        (batch: any) => batch.expirationDate && batch.expirationDate < new Date(),
+      ).length,
     }));
   }
 
-  /**
-   * Gera relatório de movimentações
-   */
-  async findMovementsForReport(companyId: string, startDate?: string, endDate?: string): Promise<StockMovementReportDTO[]> {
-    const where: Record<string, unknown> = {
+  async findMovementsForReport(
+    companyId: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<StockMovementReportDTO[]> {
+    const where: Prisma.StockMovementWhereInput = {
       companyId,
-      deletedAt: null
+      deletedAt: null,
     };
 
     if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) {
-        where.createdAt.gte = new Date(startDate);
-      }
-      if (endDate) {
-        where.createdAt.lte = new Date(endDate);
-      }
+      where.createdAt = {
+        ...(startDate ? { gte: new Date(startDate) } : {}),
+        ...(endDate ? { lte: new Date(endDate) } : {}),
+      };
     }
 
     const movements = await this.prisma.stockMovement.findMany({
@@ -996,43 +1013,43 @@ export class StockRepository {
         product: {
           select: {
             name: true,
-            code: true
-          }
+            sku: true,
+          },
         },
-        location: {
+        fromLocation: {
           select: {
-            name: true
-          }
+            name: true,
+          },
         },
-        destinationLocation: {
+        toLocation: {
           select: {
-            name: true
-          }
+            name: true,
+          },
         },
         user: {
           select: {
-            name: true
-          }
-        }
+            name: true,
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: 'desc',
+      },
     });
 
-    return movements.map(movement => ({
+    return movements.map((movement: any) => ({
       date: movement.createdAt.toISOString().split('T')[0],
       productName: movement.product.name,
-      productCode: movement.product.code,
+      productCode: movement.product.sku,
       type: movement.type,
-      quantity: movement.quantity,
-      unitCost: movement.unitCost,
-      totalCost: movement.totalCost,
+      quantity: movement.quantity.toNumber(),
+      unitCost: movement.unitCost?.toNumber() || null,
+      totalCost: movement.totalCost?.toNumber() || null,
       reason: movement.reason,
       reference: movement.reference,
-      locationName: movement.location?.name || null,
-      destinationLocationName: movement.destinationLocation?.name || null,
-      userName: movement.user.name
+      locationName: movement.fromLocation?.name || null,
+      destinationLocationName: movement.toLocation?.name || null,
+      userName: movement.user.name,
     }));
   }
 }

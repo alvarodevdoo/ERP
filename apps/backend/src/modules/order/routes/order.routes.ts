@@ -4,7 +4,8 @@ import {
   updateOrderSchema,
   orderFiltersSchema,
   updateOrderStatusSchema,
-  assignOrderSchema,
+  // Removendo importação inexistente
+  // assignOrderSchema,
   addOrderTimeTrackingSchema,
   updateOrderTimeTrackingSchema,
   addOrderExpenseSchema,
@@ -13,7 +14,6 @@ import {
   UpdateOrderDTO,
   OrderFiltersDTO,
   UpdateOrderStatusDTO,
-  AssignOrderDTO,
   AddOrderTimeTrackingDTO,
   UpdateOrderTimeTrackingDTO,
   AddOrderExpenseDTO,
@@ -21,32 +21,33 @@ import {
 } from '../dtos';
 import { OrderService } from '../services';
 import { requirePermission, authMiddleware } from '../../../shared/middlewares/auth';
-import { createValidation } from '../../../shared/middlewares/validation';
+import { createValidation, commonSchemas } from '../../../shared/middlewares/validation';
 import { extractTenant } from '../../../shared/middlewares/tenant';
+import { buildRouteSchema } from '../../../shared/utils/zod-to-json';
 
 import { AppError } from '../../../shared/errors/AppError';
 
 export async function orderRoutes(fastify: FastifyInstance) {
   const orderService = new OrderService(fastify.prisma);
 
-  // Middleware para todas as rotas
-  fastify.addHook('preHandler', authMiddleware);
+  // 
+  // Middleware para todas as rotas  fastify.addHook('preHandler', authMiddleware);
   fastify.addHook('preHandler', extractTenant);
 
   /**
    * Criar nova ordem de serviço
    */
-  fastify.post<{
-    Body: CreateOrderDTO;
-  }>('/', {
+  fastify.post('/', {
     preHandler: [
       requirePermission('orders:create'),
       createValidation({ body: createOrderSchema })
     ],
-    handler: async (request: FastifyRequest<{ Body: CreateOrderDTO }>, reply: FastifyReply) => {
+    schema: buildRouteSchema({ body: createOrderSchema, tags: ['Orders'] }),
+    handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
-        const order = await orderService.create(request.body, companyId, userId);
+        const { companyId, id: userId } = request.user!;
+        // 
+        const order = await orderService.create(request.body as CreateOrderDTO, companyId, userId);
         
         return reply.status(201).send({
           success: true,
@@ -73,25 +74,25 @@ export async function orderRoutes(fastify: FastifyInstance) {
   /**
    * Listar ordens com filtros e paginação
    */
-  fastify.get<{
-    Querystring: OrderFiltersDTO;
-  }>('/', {
+  fastify.get('/', {
     preHandler: [
       requirePermission('orders:read'),
       createValidation({ querystring: orderFiltersSchema })
     ],
-    handler: async (request: FastifyRequest<{ Querystring: OrderFiltersDTO }>, reply: FastifyReply) => {
+    schema: buildRouteSchema({ querystring: orderFiltersSchema, tags: ['Orders'] }),
+    handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
-        const result = await orderService.findMany(request.query, companyId, userId);
+        const { companyId, id: userId } = request.user!;
+        const result = await orderService.findMany(request.query as OrderFiltersDTO, companyId, userId);
         
         return reply.send({
-          success: true,
+          success: true,          
           data: result.orders,
-          pagination: {
-            page: result.page,
-            limit: result.limit,
-            total: result.total,
+          //  - Pagination typing
+          pagination: {            
+            page: result.page,            
+            limit: result.limit,            
+            total: result.total,            
             totalPages: result.totalPages
           }
         });
@@ -115,14 +116,14 @@ export async function orderRoutes(fastify: FastifyInstance) {
   /**
    * Buscar ordem por ID
    */
-  fastify.get<{
-    Params: { id: string };
-  }>('/:id', {
+  fastify.get('/:id', {
     preHandler: [requirePermission('orders:read')],
-    handler: async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    schema: buildRouteSchema({ params: commonSchemas.idParam, tags: ['Orders'] }),
+    handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
-        const order = await orderService.findById(request.params.id, companyId, userId);
+        //  - Params typing
+        const { companyId, id: userId } = request.user as { companyId: string; id: string };
+        const order = await orderService.findById((request.params as { id: string }).id, companyId, userId);
         
         return reply.send({
           success: true,
@@ -148,18 +149,16 @@ export async function orderRoutes(fastify: FastifyInstance) {
   /**
    * Atualizar ordem
    */
-  fastify.put<{
-    Params: { id: string };
-    Body: UpdateOrderDTO;
-  }>('/:id', {
+  fastify.put('/:id', {
     preHandler: [
       requirePermission('orders:update'),
       createValidation({ body: updateOrderSchema })
     ],
-    handler: async (request: FastifyRequest<{ Params: { id: string }; Body: UpdateOrderDTO }>, reply: FastifyReply) => {
+    schema: buildRouteSchema({ params: commonSchemas.idParam, body: updateOrderSchema, tags: ['Orders'] }),
+    handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
-        const order = await orderService.update(request.params.id, request.body, companyId, userId);
+        const { companyId, id: userId } = request.user as { companyId: string; id: string };        
+        const order = await orderService.update((request.params as { id: string }).id, request.body as UpdateOrderDTO, companyId, userId);
         
         return reply.send({
           success: true,
@@ -186,14 +185,13 @@ export async function orderRoutes(fastify: FastifyInstance) {
   /**
    * Excluir ordem (soft delete)
    */
-  fastify.delete<{
-    Params: { id: string };
-  }>('/:id', {
+  fastify.delete('/:id', {
     preHandler: [requirePermission('orders:delete')],
-    handler: async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    schema: buildRouteSchema({ params: commonSchemas.idParam, tags: ['Orders'] }),
+    handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
-        await orderService.delete(request.params.id, companyId, userId);
+        const { companyId, id: userId } = request.user as { companyId: string; id: string };
+        await orderService.delete((request.params as { id: string }).id, companyId, userId);
         
         return reply.send({
           success: true,
@@ -219,14 +217,14 @@ export async function orderRoutes(fastify: FastifyInstance) {
   /**
    * Restaurar ordem excluída
    */
-  fastify.post<{
-    Params: { id: string };
-  }>('/:id/restore', {
+  fastify.post('/:id/restore', {
     preHandler: [requirePermission('orders:restore')],
-    handler: async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    schema: buildRouteSchema({ params: commonSchemas.idParam, tags: ['Orders'] }),
+    handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
-        const order = await orderService.restore(request.params.id, companyId, userId);
+        const { companyId, id: userId } = request.user!;        
+        const { id } = request.params as { id: string };
+        const order = await orderService.restore(id, companyId, userId);
         
         return reply.send({
           success: true,
@@ -253,18 +251,15 @@ export async function orderRoutes(fastify: FastifyInstance) {
   /**
    * Atualizar status da ordem
    */
-  fastify.patch<{
-    Params: { id: string };
-    Body: UpdateOrderStatusDTO;
-  }>('/:id/status', {
+  fastify.patch('/:id/status', {
     preHandler: [
       requirePermission('orders:update'),
       createValidation({ body: updateOrderStatusSchema })
     ],
-    handler: async (request: FastifyRequest<{ Params: { id: string }; Body: UpdateOrderStatusDTO }>, reply: FastifyReply) => {
+    handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
-        const order = await orderService.updateStatus(request.params.id, request.body, companyId, userId);
+        //  - Params typing
+        const { companyId, id: userId } = request.user!;        const order = await orderService.updateStatus((request.params as { id: string }).id, request.body as UpdateOrderStatusDTO, companyId, userId);
         
         return reply.send({
           success: true,
@@ -288,59 +283,20 @@ export async function orderRoutes(fastify: FastifyInstance) {
     }
   });
 
-  /**
-   * Atribuir ordem a um funcionário
-   */
-  fastify.patch<{
-    Params: { id: string };
-    Body: AssignOrderDTO;
-  }>('/:id/assign', {
-    preHandler: [
-      requirePermission('orders:assign'),
-      createValidation({ body: assignOrderSchema })
-    ],
-    handler: async (request: FastifyRequest<{ Params: { id: string }; Body: AssignOrderDTO }>, reply: FastifyReply) => {
-      try {
-        const { companyId, userId } = request.user;
-        const order = await orderService.assign(request.params.id, request.body, companyId, userId);
-        
-        return reply.send({
-          success: true,
-          data: order,
-          message: 'Ordem atribuída com sucesso'
-        });
-      } catch (error) {
-        if (error instanceof AppError) {
-          return reply.status(error.statusCode).send({
-            success: false,
-            message: error.message
-          });
-        }
-        
-        fastify.log.error(error);
-        return reply.status(500).send({
-          success: false,
-          message: 'Erro interno do servidor'
-        });
-      }
-    }
-  });
+
 
   /**
    * Adicionar registro de tempo
    */
-  fastify.post<{
-    Params: { id: string };
-    Body: AddOrderTimeTrackingDTO;
-  }>('/:id/time-tracking', {
+  fastify.post('/:id/time-tracking', {
     preHandler: [
       requirePermission('orders:time_tracking'),
       createValidation({ body: addOrderTimeTrackingSchema })
     ],
-    handler: async (request: FastifyRequest<{ Params: { id: string }; Body: AddOrderTimeTrackingDTO }>, reply: FastifyReply) => {
+    handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
-        await orderService.addTimeTracking(request.params.id, request.body, companyId, userId);
+        //  - Params typing
+        const { companyId, id: userId } = request.user!;        await orderService.addTimeTracking((request.params as { id: string }).id, request.body as AddOrderTimeTrackingDTO, companyId, userId);
         
         return reply.status(201).send({
           success: true,
@@ -366,18 +322,15 @@ export async function orderRoutes(fastify: FastifyInstance) {
   /**
    * Atualizar registro de tempo
    */
-  fastify.put<{
-    Params: { timeTrackingId: string };
-    Body: UpdateOrderTimeTrackingDTO;
-  }>('/time-tracking/:timeTrackingId', {
+  fastify.put('/time-tracking/:timeTrackingId', {
     preHandler: [
       requirePermission('orders:time_tracking'),
       createValidation({ body: updateOrderTimeTrackingSchema })
     ],
-    handler: async (request: FastifyRequest<{ Params: { timeTrackingId: string }; Body: UpdateOrderTimeTrackingDTO }>, reply: FastifyReply) => {
+    handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
-        await orderService.updateTimeTracking(request.params.timeTrackingId, request.body, companyId, userId);
+        //  - Params typing
+        const { companyId, id: userId } = request.user!;        await orderService.updateTimeTracking((request.params as { timeTrackingId: string }).timeTrackingId, request.body as UpdateOrderTimeTrackingDTO, companyId, userId);
         
         return reply.send({
           success: true,
@@ -403,14 +356,12 @@ export async function orderRoutes(fastify: FastifyInstance) {
   /**
    * Remover registro de tempo
    */
-  fastify.delete<{
-    Params: { timeTrackingId: string };
-  }>('/time-tracking/:timeTrackingId', {
+  fastify.delete('/time-tracking/:timeTrackingId', {
     preHandler: [requirePermission('orders:time_tracking')],
-    handler: async (request: FastifyRequest<{ Params: { timeTrackingId: string } }>, reply: FastifyReply) => {
+    handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
-        await orderService.removeTimeTracking(request.params.timeTrackingId, companyId, userId);
+        //  - Params typing
+        const { companyId, id: userId } = request.user!;        await orderService.removeTimeTracking((request.params as { timeTrackingId: string }).timeTrackingId, companyId, userId);
         
         return reply.send({
           success: true,
@@ -436,18 +387,15 @@ export async function orderRoutes(fastify: FastifyInstance) {
   /**
    * Adicionar despesa
    */
-  fastify.post<{
-    Params: { id: string };
-    Body: AddOrderExpenseDTO;
-  }>('/:id/expenses', {
+  fastify.post('/:id/expenses', {
     preHandler: [
       requirePermission('orders:expenses'),
       createValidation({ body: addOrderExpenseSchema })
     ],
-    handler: async (request: FastifyRequest<{ Params: { id: string }; Body: AddOrderExpenseDTO }>, reply: FastifyReply) => {
+    handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
-        await orderService.addExpense(request.params.id, request.body, companyId, userId);
+        //  - Params typing
+        const { companyId, id: userId } = request.user!;        await orderService.addExpense((request.params as { id: string }).id, request.body as AddOrderExpenseDTO, companyId, userId);
         
         return reply.status(201).send({
           success: true,
@@ -473,18 +421,15 @@ export async function orderRoutes(fastify: FastifyInstance) {
   /**
    * Atualizar despesa
    */
-  fastify.put<{
-    Params: { expenseId: string };
-    Body: UpdateOrderExpenseDTO;
-  }>('/expenses/:expenseId', {
+  fastify.put('/expenses/:expenseId', {
     preHandler: [
       requirePermission('orders:expenses'),
       createValidation({ body: updateOrderExpenseSchema })
     ],
-    handler: async (request: FastifyRequest<{ Params: { expenseId: string }; Body: UpdateOrderExpenseDTO }>, reply: FastifyReply) => {
+    handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
-        await orderService.updateExpense(request.params.expenseId, request.body, companyId, userId);
+        //  - Params typing
+        const { companyId, id: userId } = request.user!;        await orderService.updateExpense((request.params as { expenseId: string }).expenseId, request.body as UpdateOrderExpenseDTO, companyId, userId);
         
         return reply.send({
           success: true,
@@ -510,14 +455,12 @@ export async function orderRoutes(fastify: FastifyInstance) {
   /**
    * Remover despesa
    */
-  fastify.delete<{
-    Params: { expenseId: string };
-  }>('/expenses/:expenseId', {
+  fastify.delete('/expenses/:expenseId', {
     preHandler: [requirePermission('orders:expenses')],
-    handler: async (request: FastifyRequest<{ Params: { expenseId: string } }>, reply: FastifyReply) => {
+    handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
-        await orderService.removeExpense(request.params.expenseId, companyId, userId);
+        //  - Params typing
+        const { companyId, id: userId } = request.user!;        await orderService.removeExpense((request.params as { expenseId: string }).expenseId, companyId, userId);
         
         return reply.send({
           success: true,
@@ -547,7 +490,7 @@ export async function orderRoutes(fastify: FastifyInstance) {
     preHandler: [requirePermission('orders:delete')],
     handler: async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, id: userId } = request.user!;
         const stats = await orderService.getStats(companyId, userId);
         
         return reply.send({
@@ -574,18 +517,17 @@ export async function orderRoutes(fastify: FastifyInstance) {
   /**
    * Gerar relatório de ordens
    */
-  fastify.get<{
-    Querystring: OrderFiltersDTO & { format?: 'json' | 'csv' };
-  }>('/report', {
+  fastify.get('/report', {
     preHandler: [requirePermission('orders:export')],
-    handler: async (request: FastifyRequest<{ Querystring: OrderFiltersDTO & { format?: 'json' | 'csv' } }>, reply: FastifyReply) => {
+    handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
-        const { format = 'json', ...filters } = request.query;
+        //  - Query parameters typing
+        const { companyId, id: userId } = request.user!;        const { format = 'json', ...filters } = request.query as OrderFiltersDTO & { format: string };
+        const fmt: 'json' | 'csv' = format === 'csv' ? 'csv' : 'json';
         
-        const report = await orderService.generateReport(filters, format, companyId, userId);
+        const report = await orderService.generateReport(filters, fmt, companyId, userId);
         
-        if (format === 'csv') {
+        if (fmt === 'csv') {
           reply.header('Content-Type', 'text/csv');
           reply.header('Content-Disposition', 'attachment; filename="relatorio-ordens.csv"');
           return reply.send(report);
@@ -619,7 +561,7 @@ export async function orderRoutes(fastify: FastifyInstance) {
     preHandler: [requirePermission('orders:dashboard')],
     handler: async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, id: userId } = request.user!;
         const dashboard = await orderService.getDashboard(companyId, userId);
         
         return reply.send({

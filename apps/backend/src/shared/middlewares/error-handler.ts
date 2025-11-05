@@ -29,7 +29,7 @@ export async function errorHandler(fastify: FastifyInstance) {
       return reply.status(400).send({
         error: 'Validation Error',
         message: 'Invalid request data',
-        details: error.errors.map(err => ({
+        details: error.issues.map(err => ({
           field: err.path.join('.'),
           message: err.message,
           code: err.code,

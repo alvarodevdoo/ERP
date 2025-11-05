@@ -1,4 +1,34 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient, $Enums } from '@prisma/client';
+
+// Definir o objeto de inclusão para o Prisma
+const quoteInclude = {
+  include: {
+    partner: {
+      select: {
+        name: true,
+        document: true,
+      },
+    },
+    items: {
+      include: {
+        product: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    },
+    user: {
+      select: {
+        name: true,
+      },
+    },
+  },
+};
+
+// Inferir o tipo do Quote com base no objeto de inclusão
+type QuoteWithRelations = Prisma.QuoteGetPayload<typeof quoteInclude>;
+
 import { 
   CreateQuoteDTO, 
   UpdateQuoteDTO, 
@@ -15,70 +45,15 @@ export class QuoteRepository {
   /**
    * Cria um novo orçamento
    */
-  async create(data: CreateQuoteDTO, userId: string, companyId: string): Promise<QuoteResponseDTO> {
+  async create(data: Prisma.QuoteCreateInput): Promise<QuoteResponseDTO> {
     try {
-      // Gera número sequencial do orçamento
-      const lastQuote = await this.prisma.quote.findFirst({
-        where: { companyId },
-        orderBy: { number: 'desc' },
-        select: { number: true }
-      });
-
-      const nextNumber = this.generateNextNumber(lastQuote?.number);
-
       const quote = await this.prisma.quote.create({
-        data: {
-          number: nextNumber,
-          customerId: data.customerId,
-          title: data.title,
-          description: data.description,
-          validUntil: new Date(data.validUntil),
-          paymentTerms: data.paymentTerms,
-          deliveryTerms: data.deliveryTerms,
-          observations: data.observations,
-          discount: data.discount,
-          discountType: data.discountType,
-          status: 'DRAFT',
-          createdBy: userId,
-          companyId,
-          items: {
-            create: data.items.map(item => ({
-              productId: item.productId,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              discount: item.discount,
-              discountType: item.discountType,
-              observations: item.observations
-            }))
-          }
-        },
-        include: {
-          customer: {
-            select: {
-              name: true,
-              document: true
-            }
-          },
-          items: {
-            include: {
-              product: {
-                select: {
-                  name: true,
-                  code: true
-                }
-              }
-            }
-          },
-          createdByUser: {
-            select: {
-              name: true
-            }
-          }
-        }
+        data,
+        ...quoteInclude,
       });
-
       return this.mapToResponseDTO(quote);
-    } catch {
+    } catch (error) {
+      // TODO: Adicionar log do erro
       throw new AppError('Erro ao criar orçamento', 500);
     }
   }
@@ -94,33 +69,11 @@ export class QuoteRepository {
           companyId,
           deletedAt: null
         },
-        include: {
-          customer: {
-            select: {
-              name: true,
-              document: true
-            }
-          },
-          items: {
-            include: {
-              product: {
-                select: {
-                  name: true,
-                  code: true
-                }
-              }
-            }
-          },
-          createdByUser: {
-            select: {
-              name: true
-            }
-          }
-        }
+        ...quoteInclude,
       });
 
       return quote ? this.mapToResponseDTO(quote) : null;
-    } catch {
+    } catch (error) {
       throw new AppError('Erro ao buscar orçamento', 500);
     }
   }
@@ -152,7 +105,7 @@ export class QuoteRepository {
         sortOrder
       } = filters;
 
-      const where: Record<string, unknown> = {
+      const where: Prisma.QuoteWhereInput = {
         companyId,
         deletedAt: null
       };
@@ -164,64 +117,44 @@ export class QuoteRepository {
           { number: { contains: search, mode: 'insensitive' } },
           { description: { contains: search, mode: 'insensitive' } },
           {
-            customer: {
-              name: { contains: search, mode: 'insensitive' }
-            }
-          }
+            partner: { // Corrigido de customer para partner
+              name: { contains: search, mode: 'insensitive' },
+            },
+          },
         ];
       }
 
       // Filtro por cliente
       if (customerId) {
-        where.customerId = customerId;
+        where.partnerId = customerId; // Corrigido de customerId para partnerId
       }
 
       // Filtro por status
       if (status) {
-        where.status = status;
+        where.status = status as $Enums.QuoteStatus;
       }
 
       // Filtro por período
       if (startDate || endDate) {
-        where.createdAt = {};
-        if (startDate) where.createdAt.gte = new Date(startDate);
-        if (endDate) where.createdAt.lte = new Date(endDate);
+        where.createdAt = {
+          ...(startDate && { gte: new Date(startDate) }),
+          ...(endDate && { lte: new Date(endDate) }),
+        };
       }
 
       // Filtro por valor
       if (minValue !== undefined || maxValue !== undefined) {
-        where.totalValue = {};
-        if (minValue !== undefined) where.totalValue.gte = minValue;
-        if (maxValue !== undefined) where.totalValue.lte = maxValue;
+        where.totalValue = {
+          ...(minValue !== undefined && { gte: minValue }),
+          ...(maxValue !== undefined && { lte: maxValue }),
+        };
       }
 
       const [quotes, total] = await Promise.all([
         this.prisma.quote.findMany({
           where,
-          include: {
-            customer: {
-              select: {
-                name: true,
-                document: true
-              }
-            },
-            items: {
-              include: {
-                product: {
-                  select: {
-                    name: true,
-                    code: true
-                  }
-                }
-              }
-            },
-            createdByUser: {
-              select: {
-                name: true
-              }
-            }
-          },
-          orderBy: { [sortBy]: sortOrder },
+          ...quoteInclude,
+          orderBy: { [sortBy]: sortOrder } as any,
           skip: (page - 1) * limit,
           take: limit
         }),
@@ -237,7 +170,7 @@ export class QuoteRepository {
           totalPages: Math.ceil(total / limit)
         }
       };
-    } catch {
+    } catch (error) {
       throw new AppError('Erro ao listar orçamentos', 500);
     }
   }
@@ -245,67 +178,16 @@ export class QuoteRepository {
   /**
    * Atualiza orçamento
    */
-  async update(id: string, data: UpdateQuoteDTO, companyId: string): Promise<QuoteResponseDTO> {
+  async update(id: string, data: Prisma.QuoteUpdateInput): Promise<QuoteResponseDTO> {
     try {
       const quote = await this.prisma.quote.update({
-        where: {
-          id,
-          companyId,
-          deletedAt: null
-        },
-        data: {
-          customerId: data.customerId,
-          title: data.title,
-          description: data.description,
-          validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
-          paymentTerms: data.paymentTerms,
-          deliveryTerms: data.deliveryTerms,
-          observations: data.observations,
-          discount: data.discount,
-          discountType: data.discountType,
-          updatedAt: new Date(),
-          // Atualiza itens se fornecidos
-          ...(data.items && {
-            items: {
-              deleteMany: {}, // Remove todos os itens existentes
-              create: data.items.map(item => ({
-                productId: item.productId,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice,
-                discount: item.discount,
-                discountType: item.discountType,
-                observations: item.observations
-              }))
-            }
-          })
-        },
-        include: {
-          customer: {
-            select: {
-              name: true,
-              document: true
-            }
-          },
-          items: {
-            include: {
-              product: {
-                select: {
-                  name: true,
-                  code: true
-                }
-              }
-            }
-          },
-          createdByUser: {
-            select: {
-              name: true
-            }
-          }
-        }
+        where: { id },
+        data,
+        ...quoteInclude,
       });
-
       return this.mapToResponseDTO(quote);
-    } catch {
+    } catch (error) {
+      // TODO: Adicionar log do erro
       throw new AppError('Erro ao atualizar orçamento', 500);
     }
   }
@@ -319,13 +201,13 @@ export class QuoteRepository {
         where: {
           id,
           companyId,
-          deletedAt: null
+          deletedAt: null,
         },
         data: {
-          deletedAt: new Date()
-        }
+          deletedAt: new Date(),
+        },
       });
-    } catch {
+    } catch (error) {
       throw new AppError('Erro ao excluir orçamento', 500);
     }
   }
@@ -338,39 +220,17 @@ export class QuoteRepository {
       const quote = await this.prisma.quote.update({
         where: {
           id,
-          companyId
+          companyId,
         },
         data: {
           deletedAt: null,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         },
-        include: {
-          customer: {
-            select: {
-              name: true,
-              document: true
-            }
-          },
-          items: {
-            include: {
-              product: {
-                select: {
-                  name: true,
-                  code: true
-                }
-              }
-            }
-          },
-          createdByUser: {
-            select: {
-              name: true
-            }
-          }
-        }
+        ...quoteInclude,
       });
 
       return this.mapToResponseDTO(quote);
-    } catch {
+    } catch (error) {
       throw new AppError('Erro ao restaurar orçamento', 500);
     }
   }
@@ -378,45 +238,23 @@ export class QuoteRepository {
   /**
    * Atualiza status do orçamento
    */
-  async updateStatus(id: string, status: string, companyId: string): Promise<QuoteResponseDTO> {
+  async updateStatus(id: string, status: $Enums.QuoteStatus, companyId: string): Promise<QuoteResponseDTO> {
     try {
       const quote = await this.prisma.quote.update({
         where: {
           id,
           companyId,
-          deletedAt: null
+          deletedAt: null,
         },
         data: {
-          status: status as string,
-          updatedAt: new Date()
+          status: status,
+          updatedAt: new Date(),
         },
-        include: {
-          customer: {
-            select: {
-              name: true,
-              document: true
-            }
-          },
-          items: {
-            include: {
-              product: {
-                select: {
-                  name: true,
-                  code: true
-                }
-              }
-            }
-          },
-          createdByUser: {
-            select: {
-              name: true
-            }
-          }
-        }
+        ...quoteInclude,
       });
 
       return this.mapToResponseDTO(quote);
-    } catch {
+    } catch (error) {
       throw new AppError('Erro ao atualizar status do orçamento', 500);
     }
   }
@@ -424,85 +262,15 @@ export class QuoteRepository {
   /**
    * Duplica orçamento
    */
-  async duplicate(id: string, data: Record<string, unknown>, userId: string, companyId: string): Promise<QuoteResponseDTO> {
+  async duplicate(data: Prisma.QuoteCreateInput): Promise<QuoteResponseDTO> {
     try {
-      const originalQuote = await this.prisma.quote.findFirst({
-        where: {
-          id,
-          companyId,
-          deletedAt: null
-        },
-        include: {
-          items: true
-        }
-      });
-
-      if (!originalQuote) {
-        throw new AppError('Orçamento não encontrado', 404);
-      }
-
-      // Gera novo número
-      const lastQuote = await this.prisma.quote.findFirst({
-        where: { companyId },
-        orderBy: { number: 'desc' },
-        select: { number: true }
-      });
-
-      const nextNumber = this.generateNextNumber(lastQuote?.number);
-
       const quote = await this.prisma.quote.create({
-        data: {
-          number: nextNumber,
-          customerId: data.customerId || originalQuote.customerId,
-          title: data.title || `${originalQuote.title} (Cópia)`,
-          description: originalQuote.description,
-          validUntil: data.validUntil ? new Date(data.validUntil) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 dias
-          paymentTerms: originalQuote.paymentTerms,
-          deliveryTerms: originalQuote.deliveryTerms,
-          observations: originalQuote.observations,
-          discount: originalQuote.discount,
-          discountType: originalQuote.discountType,
-          status: 'DRAFT',
-          createdBy: userId,
-          companyId,
-          items: {
-            create: originalQuote.items.map(item => ({
-              productId: item.productId,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              discount: item.discount,
-              discountType: item.discountType,
-              observations: item.observations
-            }))
-          }
-        },
-        include: {
-          customer: {
-            select: {
-              name: true,
-              document: true
-            }
-          },
-          items: {
-            include: {
-              product: {
-                select: {
-                  name: true,
-                  code: true
-                }
-              }
-            }
-          },
-          createdByUser: {
-            select: {
-              name: true
-            }
-          }
-        }
+        data,
+        ...quoteInclude,
       });
-
       return this.mapToResponseDTO(quote);
-    } catch {
+    } catch (error) {
+      // TODO: Adicionar log do erro
       throw new AppError('Erro ao duplicar orçamento', 500);
     }
   }
@@ -587,7 +355,7 @@ export class QuoteRepository {
         })
       ]);
 
-      const statusMap = byStatus.reduce((acc, item) => {
+      const statusMap = byStatus.reduce<Record<string, number>>((acc, item) => {
         acc[item.status.toLowerCase()] = item._count;
         return acc;
       }, {} as Record<string, number>);
@@ -604,23 +372,23 @@ export class QuoteRepository {
           expired: statusMap.expired || 0,
           converted: statusMap.converted || 0
         },
-        totalValue: totalValue._sum.totalValue || 0,
-        averageValue: totalValue._avg.totalValue || 0,
+        totalValue: totalValue._sum.totalValue?.toNumber() || 0,
+        averageValue: totalValue._avg.totalValue?.toNumber() || 0,
         conversionRate,
         thisMonth: {
           total: thisMonth._count,
-          totalValue: thisMonth._sum.totalValue || 0,
+          totalValue: thisMonth._sum.totalValue?.toNumber() || 0,
           approved: thisMonthApproved._count,
-          approvedValue: thisMonthApproved._sum.totalValue || 0
+          approvedValue: thisMonthApproved._sum.totalValue?.toNumber() || 0,
         },
         lastMonth: {
           total: lastMonth._count,
-          totalValue: lastMonth._sum.totalValue || 0,
+          totalValue: lastMonth._sum.totalValue?.toNumber() || 0,
           approved: lastMonthApproved._count,
-          approvedValue: lastMonthApproved._sum.totalValue || 0
-        }
+          approvedValue: lastMonthApproved._sum.totalValue?.toNumber() || 0,
+        },
       };
-    } catch {
+    } catch (error) {
       throw new AppError('Erro ao obter estatísticas', 500);
     }
   }
@@ -630,18 +398,21 @@ export class QuoteRepository {
    */
   async findForReport(filters: QuoteFiltersDTO, companyId: string): Promise<QuoteReportDTO[]> {
     try {
-      const where: Record<string, unknown> = {
+      const where: Prisma.QuoteWhereInput = {
         companyId,
         deletedAt: null
       };
 
       // Aplica filtros similares ao findMany
-      if (filters.customerId) where.customerId = filters.customerId;
-      if (filters.status) where.status = filters.status;
+      // 
+      // O modelo Prisma usa partnerId (não customerId)
+      if (filters.customerId) where.partnerId = filters.customerId;
+      if (filters.status) where.status = filters.status as $Enums.QuoteStatus;
       if (filters.startDate || filters.endDate) {
-        where.createdAt = {};
-        if (filters.startDate) where.createdAt.gte = new Date(filters.startDate);
-        if (filters.endDate) where.createdAt.lte = new Date(filters.endDate);
+        where.createdAt = {
+          ...(filters.startDate && { gte: new Date(filters.startDate) }),
+          ...(filters.endDate && { lte: new Date(filters.endDate) }),
+        };
       }
 
       const quotes = await this.prisma.quote.findMany({
@@ -653,45 +424,45 @@ export class QuoteRepository {
           status: true,
           validUntil: true,
           subtotal: true,
-          discountValue: true,
+          discount: true,
           totalValue: true,
           createdAt: true,
-          customer: {
+          partner: {
             select: {
               name: true,
-              document: true
-            }
+              document: true,
+            },
           },
           items: {
             select: {
-              id: true
-            }
+              id: true,
+            },
           },
-          createdByUser: {
+          user: {
             select: {
-              name: true
-            }
-          }
+              name: true,
+            },
+          },
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       });
 
       return quotes.map(quote => ({
         id: quote.id,
         number: quote.number,
-        customerName: quote.customer.name,
-        customerDocument: quote.customer.document,
+        customerName: quote.partner.name,
+        customerDocument: quote.partner.document,
         title: quote.title,
         status: quote.status,
         validUntil: quote.validUntil.toISOString(),
-        subtotal: quote.subtotal || 0,
-        discountValue: quote.discountValue || 0,
-        totalValue: quote.totalValue || 0,
+        subtotal: quote.subtotal.toNumber(),
+        discountValue: quote.discount.toNumber(), // O relatório parece querer o desconto do orçamento, não o calculado
+        totalValue: quote.totalValue.toNumber(),
         itemsCount: quote.items.length,
         createdAt: quote.createdAt.toISOString(),
-        createdByName: quote.createdByUser.name
+        createdByName: quote.user.name,
       }));
-    } catch {
+    } catch (error) {
       throw new AppError('Erro ao gerar relatório', 500);
     }
   }
@@ -699,74 +470,80 @@ export class QuoteRepository {
   /**
    * Gera próximo número sequencial
    */
-  private generateNextNumber(lastNumber?: string): string {
+  private generateNextNumber(lastNumber?: string | null): string {
     if (!lastNumber) {
       return 'ORC-000001';
     }
 
-    const numberPart = lastNumber.split('-')[1];
-    const nextNumber = (parseInt(numberPart) + 1).toString().padStart(6, '0');
+    const parts = lastNumber.split('-');
+    if (parts.length !== 2) {
+      return 'ORC-000001'; // Retorna o padrão se o formato for inesperado
+    }
+
+    const numberPart = parseInt(parts[1] ?? '', 10);
+    if (isNaN(numberPart)) {
+      return 'ORC-000001'; // Retorna o padrão se a parte numérica não for um número
+    }
+
+    const nextNumber = (numberPart + 1).toString().padStart(6, '0');
     return `ORC-${nextNumber}`;
   }
 
-  /**
-   * Mapeia entidade para DTO de resposta
-   */
-  private mapToResponseDTO(quote: Record<string, unknown>): QuoteResponseDTO {
-    // Calcula valores dos itens
-    const items = (quote.items as Record<string, unknown>[]).map((item: Record<string, unknown>) => {
-      const subtotal = item.quantity * item.unitPrice;
-      const discountValue = item.discountType === 'PERCENTAGE' 
-        ? subtotal * (item.discount / 100)
-        : item.discount;
-      const total = subtotal - discountValue;
+
+
+  private mapToResponseDTO(quote: QuoteWithRelations): QuoteResponseDTO {
+    const items = quote.items.map(item => {
+      const subtotal = item.quantity.toNumber() * item.unitPrice.toNumber();
+      const discountValue = item.discountType === 'PERCENTAGE'
+        ? subtotal * (item.discount.toNumber() / 100)
+        : item.discount.toNumber();
+      const itemTotal = subtotal - discountValue;
 
       return {
         id: item.id,
-        productId: item.productId,
-        productName: item.product.name,
-        productCode: item.product.code,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        discount: item.discount,
+        productId: item.productId || '',
+        productName: item.product?.name || '',
+        productCode: (item.product as any)?.code || '',
+        quantity: item.quantity.toNumber(),
+        unitPrice: item.unitPrice.toNumber(),
+        discount: item.discount.toNumber(),
         discountType: item.discountType,
-        subtotal,
-        total,
-        observations: item.observations
+        subtotal: subtotal,
+        discountValue: discountValue,
+        total: itemTotal,
+        observations: item.description, // Mapeado
       };
     });
 
-    // Calcula totais do orçamento
-    const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
-    const itemsDiscountValue = items.reduce((sum, item) => sum + (item.subtotal - item.total), 0);
+    const subtotal = items.reduce((sum: number, item: any) => sum + item.subtotal, 0);
+    const itemsDiscountValue = items.reduce((sum: number, item: any) => sum + item.discountValue, 0);
     const quoteDiscountValue = quote.discountType === 'PERCENTAGE'
-      ? subtotal * (quote.discount / 100)
-      : quote.discount;
-    const totalValue = subtotal - itemsDiscountValue - quoteDiscountValue;
+      ? subtotal * (quote.discount.toNumber() / 100)
+      : quote.discount.toNumber();
 
     return {
       id: quote.id,
       number: quote.number,
-      customerId: quote.customerId,
-      customerName: quote.customer.name,
-      customerDocument: quote.customer.document,
+      customerId: quote.partnerId, // Mapeado
+      customerName: quote.partner?.name || '',
+      customerDocument: quote.partner?.document || undefined,
       title: quote.title,
-      description: quote.description,
+      description: quote.description || undefined,
       status: quote.status,
       validUntil: quote.validUntil,
-      paymentTerms: quote.paymentTerms,
-      deliveryTerms: quote.deliveryTerms,
-      observations: quote.observations,
-      discount: quote.discount,
+      paymentTerms: quote.paymentTerms || undefined,
+      deliveryTerms: quote.deliveryTerms || undefined,
+      observations: quote.notes || undefined, // Mapeado
+      discount: quote.discount.toNumber(),
       discountType: quote.discountType,
-      subtotal,
+      subtotal: quote.subtotal.toNumber(),
       discountValue: quoteDiscountValue,
-      totalValue,
+      totalValue: quote.totalValue.toNumber(),
       items,
       createdAt: quote.createdAt,
       updatedAt: quote.updatedAt,
-      createdBy: quote.createdBy,
-      createdByName: quote.createdByUser.name
+      createdBy: quote.userId, // Mapeado
+      createdByName: quote.user?.name || '',
     };
   }
 }

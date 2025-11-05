@@ -20,7 +20,8 @@
     "db:seed": "pnpm --filter backend db:seed",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f"
+    "docker:logs": "docker-compose logs -f",
+    "backend:check": "powershell -Command \"cd apps/backend; npx tsc --noEmit\""
   },
   "devDependencies": {
     "@commitlint/cli": "^18.4.0",

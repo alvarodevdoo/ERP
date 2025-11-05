@@ -28,25 +28,63 @@ async function main() {
 
   console.log('✅ Empresa criada:', company.name)
 
+  // Criar permissões básicas
+  const permissions = [
+    { name: 'Visualizar Usuários', action: 'read', resource: 'users' },
+    { name: 'Criar Usuários', action: 'write', resource: 'users' },
+    { name: 'Excluir Usuários', action: 'delete', resource: 'users' },
+    { name: 'Visualizar Produtos', action: 'read', resource: 'products' },
+    { name: 'Criar Produtos', action: 'write', resource: 'products' },
+    { name: 'Excluir Produtos', action: 'delete', resource: 'products' },
+    { name: 'Visualizar Orçamentos', action: 'read', resource: 'quotes' },
+    { name: 'Criar Orçamentos', action: 'write', resource: 'quotes' },
+    { name: 'Excluir Orçamentos', action: 'delete', resource: 'quotes' },
+    { name: 'Visualizar Pedidos', action: 'read', resource: 'orders' },
+    { name: 'Criar Pedidos', action: 'write', resource: 'orders' },
+    { name: 'Excluir Pedidos', action: 'delete', resource: 'orders' },
+    { name: 'Visualizar Estoque', action: 'read', resource: 'stock' },
+    { name: 'Gerenciar Estoque', action: 'write', resource: 'stock' },
+    { name: 'Visualizar Financeiro', action: 'read', resource: 'financial' },
+    { name: 'Gerenciar Financeiro', action: 'write', resource: 'financial' },
+    { name: 'Excluir Financeiro', action: 'delete', resource: 'financial' },
+    { name: 'Visualizar Relatórios', action: 'read', resource: 'reports' },
+  ]
+
+  const createdPermissions = []
+  for (const permission of permissions) {
+    const createdPermission = await prisma.permission.upsert({
+      where: { action_resource: { action: permission.action, resource: permission.resource } },
+      update: {},
+      create: permission,
+    })
+    createdPermissions.push(createdPermission)
+  }
+
+  console.log('✅ Permissões criadas:', createdPermissions.length)
+
   // Criar roles
+  const adminPermissionIds = createdPermissions.map(p => p.id)
   const adminRole = await prisma.role.upsert({
     where: { name_companyId: { name: 'Administrador', companyId: company.id } },
     update: {},
     create: {
       name: 'Administrador',
       description: 'Acesso total ao sistema',
-      permissions: JSON.stringify([
-        'users:read', 'users:write', 'users:delete',
-        'products:read', 'products:write', 'products:delete',
-        'quotes:read', 'quotes:write', 'quotes:delete',
-        'orders:read', 'orders:write', 'orders:delete',
-        'stock:read', 'stock:write',
-        'financial:read', 'financial:write', 'financial:delete',
-        'reports:read'
-      ]),
       companyId: company.id,
+      permissions: {
+        connect: adminPermissionIds.map(id => ({ id }))
+      }
     },
   })
+
+  const vendorPermissionIds = createdPermissions
+    .filter(p => 
+      (p.resource === 'quotes' && ['read', 'write'].includes(p.action)) ||
+      (p.resource === 'orders' && ['read', 'write'].includes(p.action)) ||
+      (p.resource === 'products' && p.action === 'read') ||
+      (p.resource === 'stock' && p.action === 'read')
+    )
+    .map(p => p.id)
 
   await prisma.role.upsert({
     where: { name_companyId: { name: 'Vendedor', companyId: company.id } },
@@ -54,13 +92,10 @@ async function main() {
     create: {
       name: 'Vendedor',
       description: 'Acesso a vendas e orçamentos',
-      permissions: JSON.stringify([
-        'quotes:read', 'quotes:write',
-        'orders:read', 'orders:write',
-        'products:read',
-        'stock:read'
-      ]),
       companyId: company.id,
+      permissions: {
+        connect: vendorPermissionIds.map(id => ({ id }))
+      }
     },
   })
 
@@ -170,6 +205,18 @@ async function main() {
 
   console.log('✅ Acabamentos criados')
 
+  // Criar categoria de produto
+  const productCategory = await prisma.productCategory.upsert({
+    where: { name_companyId: { name: 'Móveis de Escritório', companyId: company.id } },
+    update: {},
+    create: {
+      name: 'Móveis de Escritório',
+      companyId: company.id,
+    },
+  });
+
+  console.log('✅ Categoria de produto criada:', productCategory.name);
+
   // Criar produtos
   const mesa = await prisma.product.upsert({
     where: { sku_companyId: { sku: 'MESA-001', companyId: company.id } },
@@ -178,7 +225,7 @@ async function main() {
       name: 'Mesa de Escritório',
       description: 'Mesa de escritório em MDF com acabamento laminado',
       sku: 'MESA-001',
-      category: 'Móveis de Escritório',
+      categoryId: productCategory.id,
       unit: 'UN',
       costPrice: 250.00,
       salePrice: 450.00,
@@ -186,7 +233,7 @@ async function main() {
       currentStock: 15,
       companyId: company.id,
     },
-  })
+  });
 
   // Criar variantes do produto
   await prisma.variant.upsert({

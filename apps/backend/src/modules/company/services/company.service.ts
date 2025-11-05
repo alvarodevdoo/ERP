@@ -2,7 +2,7 @@ import { CompanyRepository } from '../repositories';
 import { CreateCompanyDto, UpdateCompanyDto, CompanyFiltersDto, CompanyResponseDto, CompanyListResponseDto } from '../dtos';
 import { logger } from '../../../shared/logger/index';
 import { AppError } from '../../../shared/errors/AppError';
-import { validateCNPJ, validateCPF } from '../../../shared/utils/validators';
+import { validateCNPJ } from '../../../shared/utils/validators';
 
 /**
  * Service para operações de empresa
@@ -11,8 +11,8 @@ import { validateCNPJ, validateCPF } from '../../../shared/utils/validators';
 export class CompanyService {
   private companyRepository: CompanyRepository;
 
-  constructor() {
-    this.companyRepository = new CompanyRepository();
+  constructor(companyRepository?: CompanyRepository) {
+    this.companyRepository = companyRepository || new CompanyRepository();
   }
 
   /**
@@ -22,15 +22,16 @@ export class CompanyService {
    */
   async create(data: CreateCompanyDto): Promise<CompanyResponseDto> {
     try {
-      // Validar documento (CNPJ ou CPF)
-      if (!this.validateDocument(data.document)) {
-        throw new AppError('Documento inválido', 400);
+      // Validar CNPJ
+      const cleanCnpj = data.cnpj.replace(/[^0-9]/g, '');
+      if (!validateCNPJ(cleanCnpj)) {
+        throw new AppError('CNPJ inválido', 400);
       }
 
-      // Verificar se documento já existe
-      const documentExists = await this.companyRepository.documentExists(data.document);
-      if (documentExists) {
-        throw new AppError('Documento já cadastrado', 409);
+      // Verificar se CNPJ já existe
+      const cnpjExists = await this.companyRepository.documentExists(cleanCnpj);
+      if (cnpjExists) {
+        throw new AppError('CNPJ já cadastrado', 409);
       }
 
       // Verificar se email já existe
@@ -48,7 +49,7 @@ export class CompanyService {
       if (error instanceof AppError) {
         throw error;
       }
-      logger.error(error, 'Erro ao criar empresa');
+      logger.error({ err: error }, 'Erro ao criar empresa');
       throw new AppError('Falha interna ao criar empresa', 500);
     }
   }
@@ -71,7 +72,7 @@ export class CompanyService {
       if (error instanceof AppError) {
         throw error;
       }
-      logger.error(error, 'Erro ao buscar empresa');
+      logger.error({ err: error }, 'Erro ao buscar empresa');
       throw new AppError('Falha interna ao buscar empresa', 500);
     }
   }
@@ -99,7 +100,7 @@ export class CompanyService {
         },
       };
     } catch (error) {
-      logger.error(error, 'Erro ao listar empresas');
+      logger.error({ err: error }, 'Erro ao listar empresas');
       throw new AppError('Falha interna ao listar empresas', 500);
     }
   }
@@ -118,18 +119,7 @@ export class CompanyService {
         throw new AppError('Empresa não encontrada', 404);
       }
 
-      // Validar documento se fornecido
-      if (data.document && !this.validateDocument(data.document)) {
-        throw new AppError('Documento inválido', 400);
-      }
-
-      // Verificar se documento já existe (excluindo a empresa atual)
-      if (data.document) {
-        const documentExists = await this.companyRepository.documentExists(data.document, id);
-        if (documentExists) {
-          throw new AppError('Documento já cadastrado', 409);
-        }
-      }
+      // DTO de update não prevê alteração de CNPJ; nenhuma validação de documento necessária
 
       // Verificar se email já existe (excluindo a empresa atual)
       if (data.email) {
@@ -148,7 +138,7 @@ export class CompanyService {
       if (error instanceof AppError) {
         throw error;
       }
-      logger.error(error, 'Erro ao atualizar empresa');
+      logger.error({ err: error }, 'Erro ao atualizar empresa');
       throw new AppError('Falha interna ao atualizar empresa', 500);
     }
   }
@@ -158,7 +148,7 @@ export class CompanyService {
    * @param id ID da empresa
    * @returns Empresa removida
    */
-  async delete(id: string): Promise<CompanyResponseDto> {
+  async delete(id: string): Promise<void> {
     try {
       // Verificar se empresa existe
       const existingCompany = await this.companyRepository.findById(id);
@@ -167,25 +157,25 @@ export class CompanyService {
       }
 
       // Verificar se empresa tem usuários ativos
-      if (existingCompany._count?.users && existingCompany._count.users > 0) {
+      if ((existingCompany as any)._count?.users && (existingCompany as any)._count.users > 0) {
         throw new AppError('Não é possível remover empresa com usuários ativos', 400);
       }
 
       // Verificar se empresa tem pedidos ativos
-      if (existingCompany._count?.orders && existingCompany._count.orders > 0) {
+      if ((existingCompany as any)._count?.orders && (existingCompany as any)._count.orders > 0) {
         throw new AppError('Não é possível remover empresa com pedidos cadastrados', 400);
       }
 
       // Remover empresa
-      const company = await this.companyRepository.delete(id);
+      await this.companyRepository.delete(id);
 
-      logger.info(`Empresa removida: ${company.name}`);
-      return this.mapToResponseDto(company);
+      // 
+      logger.info(`Empresa removida: ${existingCompany.name}`);
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
       }
-      logger.error(error, 'Erro ao remover empresa');
+      logger.error({ err: error }, 'Erro ao remover empresa');
       throw new AppError('Falha interna ao remover empresa', 500);
     }
   }
@@ -217,7 +207,7 @@ export class CompanyService {
       if (error instanceof AppError) {
         throw error;
       }
-      logger.error(error, 'Erro ao restaurar empresa');
+      logger.error({ err: error }, 'Erro ao restaurar empresa');
       throw new AppError('Falha interna ao restaurar empresa', 500);
     }
   }
@@ -247,7 +237,7 @@ export class CompanyService {
       if (error instanceof AppError) {
         throw error;
       }
-      logger.error(error, 'Erro ao buscar estatísticas da empresa');
+      logger.error({ err: error }, 'Erro ao buscar estatísticas da empresa');
       throw new AppError('Falha interna ao buscar estatísticas', 500);
     }
   }
@@ -257,30 +247,18 @@ export class CompanyService {
    * @param document Documento para validar
    * @returns true se válido, false caso contrário
    */
-  private validateDocument(document: string): boolean {
-    // Remove caracteres especiais
-    const cleanDocument = document.replace(/[^0-9]/g, '');
-    
-    // Verifica se é CNPJ (14 dígitos) ou CPF (11 dígitos)
-    if (cleanDocument.length === 14) {
-      return validateCNPJ(cleanDocument);
-    } else if (cleanDocument.length === 11) {
-      return validateCPF(cleanDocument);
-    }
-    
-    return false;
-  }
+  // Removida validação genérica de documento; empresas usam apenas CNPJ
 
   /**
    * Mapeia entidade Company para DTO de resposta
    * @param company Entidade Company
    * @returns DTO de resposta
    */
-  private mapToResponseDto(company: Record<string, unknown>): CompanyResponseDTO {
+  private mapToResponseDto(company: any): CompanyResponseDto {
     return {
       id: company.id,
       name: company.name,
-      document: company.cnpj,
+      cnpj: company.cnpj,
       email: company.email,
       phone: company.phone,
       address: company.address,

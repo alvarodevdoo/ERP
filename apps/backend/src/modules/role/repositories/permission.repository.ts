@@ -13,7 +13,7 @@ export class PermissionRepository {
    */
   async create(data: {
     name: string;
-    description?: string | null;
+    description?: string | null | undefined;
     resource: string;
     action: string;
     isActive?: boolean;
@@ -96,11 +96,11 @@ export class PermissionRepository {
    * Atualiza uma permissão
    */
   async update(id: string, data: {
-    name?: string;
-    description?: string | null;
-    resource?: string;
-    action?: string;
-    isActive?: boolean;
+    name?: string | undefined;
+    description?: string | null | undefined;
+    resource?: string | undefined;
+    action?: string | undefined;
+    isActive?: boolean | undefined;
   }): Promise<Permission> {
     return this.prisma.permission.update({
       where: { id },

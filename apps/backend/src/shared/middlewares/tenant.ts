@@ -8,7 +8,7 @@ declare module 'fastify' {
 }
 
 export async function tenantMiddleware(fastify: FastifyInstance) {
-  fastify.decorateRequest('companyId', null);
+  fastify.decorateRequest('companyId', '');
 
   fastify.addHook('preHandler', async (request: FastifyRequest) => {
     // Skip tenant isolation for public routes
@@ -30,7 +30,8 @@ export async function tenantMiddleware(fastify: FastifyInstance) {
       return;
     }
 
-    const user = request.user as User;
+    // Usando unknown como intermediário para evitar erro de tipo
+    const user = request.user as unknown as User;
     
     // Set company ID from authenticated user
     if (user.companyId) {
@@ -101,7 +102,8 @@ export async function extractTenant(request: FastifyRequest) {
     return;
   }
 
-  const user = request.user as User;
+  // Usando unknown como intermediário para evitar erro de tipo
+  const user = request.user as unknown as User;
   
   // Set company ID from authenticated user
   if (user.companyId) {

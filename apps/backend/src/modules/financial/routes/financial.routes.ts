@@ -31,31 +31,21 @@ import { createValidation } from '../../../shared/middlewares/validation';
 
 import { PrismaClient } from '@prisma/client';
 
-interface AuthenticatedRequest extends FastifyRequest {
-  user: {
-    id: string;
-    companyId: string;
-  };
-}
-
 export async function financialRoutes(fastify: FastifyInstance) {
   const prisma = new PrismaClient();
   const financialService = new FinancialService(prisma);
 
-  // Middleware de autenticação para todas as rotas
-  fastify.addHook('preHandler', authMiddleware);
+  // Middleware de autenticação será aplicado via requirePermission em cada rota
 
   // Rotas para transações financeiras
   
   // Criar transação
-  fastify.post<{
-    Body: CreateTransactionDTO;
-  }>('/transactions', {
+  fastify.post('/transactions', {
     preHandler: [
       requirePermission('financial:create'),
-      createValidation(createTransactionSchema)
+      createValidation({ body: createTransactionSchema })
     ]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const transaction = await financialService.createTransaction(
         request.body,
@@ -78,14 +68,12 @@ export async function financialRoutes(fastify: FastifyInstance) {
   });
 
   // Listar transações com filtros
-  fastify.get<{
-    Querystring: TransactionFiltersDTO;
-  }>('/transactions', {
+  fastify.get('/transactions', {
     preHandler: [
       requirePermission('financial:read'),
-      createValidation(transactionFiltersSchema, 'querystring')
+      createValidation({ querystring: transactionFiltersSchema })
     ]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const result = await financialService.findTransactions(
         request.query,
@@ -113,11 +101,9 @@ export async function financialRoutes(fastify: FastifyInstance) {
   });
 
   // Buscar transação por ID
-  fastify.get<{
-    Params: { id: string };
-  }>('/transactions/:id', {
+  fastify.get('/transactions/:id', {
     preHandler: [requirePermission('financial:read')]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const transaction = await financialService.findTransactionById(
         request.params.id,
@@ -139,15 +125,12 @@ export async function financialRoutes(fastify: FastifyInstance) {
   });
 
   // Atualizar transação
-  fastify.put<{
-    Params: { id: string };
-    Body: UpdateTransactionDTO;
-  }>('/transactions/:id', {
+  fastify.put('/transactions/:id', {
     preHandler: [
       requirePermission('financial:update'),
-      createValidation(updateTransactionSchema)
+      createValidation({ body: updateTransactionSchema })
     ]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const transaction = await financialService.updateTransaction(
         request.params.id,
@@ -171,15 +154,12 @@ export async function financialRoutes(fastify: FastifyInstance) {
   });
 
   // Pagar transação
-  fastify.patch<{
-    Params: { id: string };
-    Body: PayTransactionDTO;
-  }>('/transactions/:id/pay', {
+  fastify.patch('/transactions/:id/pay', {
     preHandler: [
       requirePermission('financial:update'),
-      createValidation(payTransactionSchema)
+      createValidation({ body: payTransactionSchema })
     ]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const transaction = await financialService.payTransaction(
         request.params.id,
@@ -203,11 +183,9 @@ export async function financialRoutes(fastify: FastifyInstance) {
   });
 
   // Excluir transação
-  fastify.delete<{
-    Params: { id: string };
-  }>('/transactions/:id', {
+  fastify.delete('/transactions/:id', {
     preHandler: [requirePermission('financial:delete')]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       await financialService.deleteTransaction(
         request.params.id,
@@ -231,14 +209,12 @@ export async function financialRoutes(fastify: FastifyInstance) {
   // Rotas para categorias financeiras
   
   // Criar categoria
-  fastify.post<{
-    Body: CreateCategoryDTO;
-  }>('/categories', {
+  fastify.post('/categories', {
     preHandler: [
       requirePermission('financial:create'),
-      createValidation(createCategorySchema)
+      createValidation({ body: createCategorySchema })
     ]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const category = await financialService.createCategory(
         request.body,
@@ -261,14 +237,12 @@ export async function financialRoutes(fastify: FastifyInstance) {
   });
 
   // Listar categorias com filtros
-  fastify.get<{
-    Querystring: CategoryFiltersDTO;
-  }>('/categories', {
+  fastify.get('/categories', {
     preHandler: [
       requirePermission('financial:read'),
-      createValidation(categoryFiltersSchema, 'querystring')
+      createValidation({ querystring: categoryFiltersSchema })
     ]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const result = await financialService.findCategories(
         request.query,
@@ -296,11 +270,9 @@ export async function financialRoutes(fastify: FastifyInstance) {
   });
 
   // Buscar categoria por ID
-  fastify.get<{
-    Params: { id: string };
-  }>('/categories/:id', {
+  fastify.get('/categories/:id', {
     preHandler: [requirePermission('financial:read')]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const category = await financialService.findCategoryById(
         request.params.id,
@@ -313,23 +285,21 @@ export async function financialRoutes(fastify: FastifyInstance) {
         data: category
       });
     } catch (error: unknown) {
-      return reply.code(error.statusCode || 500).send({
+      const err = error as { statusCode?: number; message?: string };
+      return reply.code(err.statusCode || 500).send({
         success: false,
-        message: error.message || 'Erro interno do servidor'
+        message: err.message || 'Erro interno do servidor'
       });
     }
   });
 
   // Atualizar categoria
-  fastify.put<{
-    Params: { id: string };
-    Body: UpdateCategoryDTO;
-  }>('/categories/:id', {
+  fastify.put('/categories/:id', {
     preHandler: [
       requirePermission('financial:update'),
-      createValidation(updateCategorySchema)
+      createValidation({ body: updateCategorySchema })
     ]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const category = await financialService.updateCategory(
         request.params.id,
@@ -344,19 +314,18 @@ export async function financialRoutes(fastify: FastifyInstance) {
         message: 'Categoria atualizada com sucesso'
       });
     } catch (error: unknown) {
-      return reply.code(error.statusCode || 500).send({
+      const err = error as { statusCode?: number; message?: string };
+      return reply.code(err.statusCode || 500).send({
         success: false,
-        message: error.message || 'Erro interno do servidor'
+        message: err.message || 'Erro interno do servidor'
       });
     }
   });
 
   // Excluir categoria
-  fastify.delete<{
-    Params: { id: string };
-  }>('/categories/:id', {
+  fastify.delete('/categories/:id', {
     preHandler: [requirePermission('financial:delete')]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       await financialService.deleteCategory(
         request.params.id,
@@ -369,9 +338,10 @@ export async function financialRoutes(fastify: FastifyInstance) {
         message: 'Categoria excluída com sucesso'
       });
     } catch (error: unknown) {
-      return reply.code(error.statusCode || 500).send({
+      const err = error as { statusCode?: number; message?: string };
+      return reply.code(err.statusCode || 500).send({
         success: false,
-        message: error.message || 'Erro interno do servidor'
+        message: err.message || 'Erro interno do servidor'
       });
     }
   });
@@ -379,14 +349,12 @@ export async function financialRoutes(fastify: FastifyInstance) {
   // Rotas para contas financeiras
   
   // Criar conta
-  fastify.post<{
-    Body: CreateAccountDTO;
-  }>('/accounts', {
+  fastify.post('/accounts', {
     preHandler: [
       requirePermission('financial:create'),
-      createValidation(createAccountSchema)
+      createValidation({ body: createAccountSchema })
     ]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const account = await financialService.createAccount(
         request.body,
@@ -400,22 +368,21 @@ export async function financialRoutes(fastify: FastifyInstance) {
         message: 'Conta criada com sucesso'
       });
     } catch (error: unknown) {
-      return reply.code(error.statusCode || 500).send({
+      const err = error as { statusCode?: number; message?: string };
+      return reply.code(err.statusCode || 500).send({
         success: false,
-        message: error.message || 'Erro interno do servidor'
+        message: err.message || 'Erro interno do servidor'
       });
     }
   });
 
   // Listar contas com filtros
-  fastify.get<{
-    Querystring: AccountFiltersDTO;
-  }>('/accounts', {
+  fastify.get('/accounts', {
     preHandler: [
       requirePermission('financial:read'),
-      createValidation(accountFiltersSchema, 'querystring')
+      createValidation({ querystring: accountFiltersSchema })
     ]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const result = await financialService.findAccounts(
         request.query,
@@ -443,11 +410,9 @@ export async function financialRoutes(fastify: FastifyInstance) {
   });
 
   // Buscar conta por ID
-  fastify.get<{
-    Params: { id: string };
-  }>('/accounts/:id', {
+  fastify.get('/accounts/:id', {
     preHandler: [requirePermission('financial:read')]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const account = await financialService.findAccountById(
         request.params.id,
@@ -469,15 +434,12 @@ export async function financialRoutes(fastify: FastifyInstance) {
   });
 
   // Atualizar conta
-  fastify.put<{
-    Params: { id: string };
-    Body: UpdateAccountDTO;
-  }>('/accounts/:id', {
+  fastify.put('/accounts/:id', {
     preHandler: [
       requirePermission('financial:update'),
-      createValidation(updateAccountSchema)
+      createValidation({ body: updateAccountSchema })
     ]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const account = await financialService.updateAccount(
         request.params.id,
@@ -501,11 +463,9 @@ export async function financialRoutes(fastify: FastifyInstance) {
   });
 
   // Excluir conta
-  fastify.delete<{
-    Params: { id: string };
-  }>('/accounts/:id', {
+  fastify.delete('/accounts/:id', {
     preHandler: [requirePermission('financial:delete')]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       await financialService.deleteAccount(
         request.params.id,
@@ -529,14 +489,12 @@ export async function financialRoutes(fastify: FastifyInstance) {
   // Rotas para transferências
   
   // Criar transferência
-  fastify.post<{
-    Body: CreateTransferDTO;
-  }>('/transfers', {
+  fastify.post('/transfers', {
     preHandler: [
       requirePermission('financial:create'),
-      createValidation(createTransferSchema)
+      createValidation({ body: createTransferSchema })
     ]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const transfer = await financialService.createTransfer(
         request.body,
@@ -559,14 +517,12 @@ export async function financialRoutes(fastify: FastifyInstance) {
   });
 
   // Listar transferências com filtros
-  fastify.get<{
-    Querystring: TransferFiltersDTO;
-  }>('/transfers', {
+  fastify.get('/transfers', {
     preHandler: [
       requirePermission('financial:read'),
-      createValidation(transferFiltersSchema, 'querystring')
+      createValidation({ querystring: transferFiltersSchema })
     ]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const result = await financialService.findTransfers(
         request.query,
@@ -596,14 +552,9 @@ export async function financialRoutes(fastify: FastifyInstance) {
   // Rotas para estatísticas e relatórios
   
   // Obter estatísticas financeiras
-  fastify.get<{
-    Querystring: {
-      startDate?: string;
-      endDate?: string;
-    };
-  }>('/stats', {
+  fastify.get('/stats', {
     preHandler: [requirePermission('financial:read')]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const stats = await financialService.getStats(
         request.user.id,
@@ -626,14 +577,9 @@ export async function financialRoutes(fastify: FastifyInstance) {
   });
 
   // Obter fluxo de caixa
-  fastify.get<{
-    Querystring: {
-      startDate: string;
-      endDate: string;
-    };
-  }>('/cash-flow', {
+  fastify.get('/cash-flow', {
     preHandler: [requirePermission('financial:read')]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       if (!request.query.startDate || !request.query.endDate) {
         return reply.code(400).send({
@@ -663,19 +609,9 @@ export async function financialRoutes(fastify: FastifyInstance) {
   });
 
   // Gerar relatório financeiro
-  fastify.get<{
-    Querystring: {
-      format?: 'json' | 'csv';
-      startDate?: string;
-      endDate?: string;
-      type?: string;
-      categoryId?: string;
-      accountId?: string;
-      status?: string;
-    };
-  }>('/reports', {
+  fastify.get('/reports', {
     preHandler: [requirePermission('financial:read')]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const { format = 'json', ...filters } = request.query;
       
@@ -708,7 +644,7 @@ export async function financialRoutes(fastify: FastifyInstance) {
   // Obter dados para dashboard financeiro
   fastify.get('/dashboard', {
     preHandler: [requirePermission('financial:read')]
-  }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const dashboard = await financialService.getDashboard(
         request.user.id,

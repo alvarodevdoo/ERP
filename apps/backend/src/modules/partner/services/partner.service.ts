@@ -1,4 +1,5 @@
-import { PrismaClient, PartnerType } from '@prisma/client';
+import { PrismaClient, $Enums } from '@prisma/client';
+import type { PartnerType } from '@prisma/client';
 import { 
   CreatePartnerDTO, 
   UpdatePartnerDTO, 
@@ -17,6 +18,7 @@ export class PartnerService {
 
   constructor(private prisma: PrismaClient) {
     this.partnerRepository = new PartnerRepository(prisma);
+    // 
     this.authService = new AuthService(prisma);
   }
 
@@ -45,7 +47,7 @@ export class PartnerService {
     this.validatePartnerByType(data);
 
     // Normaliza dados
-    const normalizedData = this.normalizePartnerData(data);
+    const normalizedData = this.normalizeCreatePartnerData(data);
 
     return await this.partnerRepository.create(normalizedData, companyId);
   }
@@ -122,7 +124,7 @@ export class PartnerService {
     }
 
     // Normaliza dados
-    const normalizedData = this.normalizePartnerData(data);
+    const normalizedData = this.normalizeUpdatePartnerData(data);
 
     return await this.partnerRepository.update(id, normalizedData, companyId);
   }
@@ -207,7 +209,7 @@ export class PartnerService {
    */
   async generateReport(filters: PartnerFiltersDTO, userId: string, companyId: string, format: 'json' | 'csv' = 'json'): Promise<PartnerReportDTO[] | string> {
     // Verifica permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'partner:read');
+    const hasPermission = await this.authService.hasPermission(userId, 'partner:read');
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para gerar relatórios', 403);
     }
@@ -243,7 +245,7 @@ export class PartnerService {
       await this.validatePartnerBlocking(id, companyId);
     }
 
-    return await this.partnerRepository.update(id, { isActive }, companyId);
+    return await this.partnerRepository.updateStatus(id, isActive, companyId);
   }
 
   /**
@@ -289,12 +291,12 @@ export class PartnerService {
     if (!data.type) return;
 
     // Clientes devem ter limite de crédito definido
-    if ((data.type === PartnerType.CUSTOMER || data.type === PartnerType.BOTH) && data.creditLimit === undefined) {
+    if ((data.type === $Enums.PartnerType.CUSTOMER || data.type === $Enums.PartnerType.BOTH) && data.creditLimit === undefined) {
       // Pode ser definido posteriormente
     }
 
     // Fornecedores devem ter termos de pagamento
-    if ((data.type === PartnerType.SUPPLIER || data.type === PartnerType.BOTH) && !data.paymentTerms) {
+    if ((data.type === $Enums.PartnerType.SUPPLIER || data.type === $Enums.PartnerType.BOTH) && !data.paymentTerms) {
       // Pode ser definido posteriormente
     }
   }
@@ -302,8 +304,8 @@ export class PartnerService {
   /**
    * Normaliza dados do parceiro
    */
-  private normalizePartnerData(data: CreatePartnerDTO | UpdatePartnerDTO): CreatePartnerDTO | UpdatePartnerDTO {
-    const normalized = { ...data };
+  private normalizePartnerData<T extends CreatePartnerDTO | UpdatePartnerDTO>(data: T): T {
+    const normalized: T = { ...data } as T;
 
     // Normaliza nome
     if (normalized.name) {
@@ -326,6 +328,14 @@ export class PartnerService {
     }
 
     return normalized;
+  }
+
+  private normalizeCreatePartnerData(data: CreatePartnerDTO): CreatePartnerDTO {
+    return this.normalizePartnerData<CreatePartnerDTO>(data);
+  }
+
+  private normalizeUpdatePartnerData(data: UpdatePartnerDTO): UpdatePartnerDTO {
+    return this.normalizePartnerData<UpdatePartnerDTO>(data);
   }
 
   /**
@@ -356,7 +366,7 @@ export class PartnerService {
   /**
    * Valida endereço
    */
-  private validateAddress(address: Record<string, unknown>): void {
+  private validateAddress(address: { street?: string | undefined; number?: string | undefined; complement?: string | undefined; neighborhood?: string | undefined; city?: string | undefined; state?: string | undefined; zipCode?: string | undefined; country?: string | undefined; }): void {
     if (address.zipCode && !this.isValidZipCode(address.zipCode)) {
       throw new AppError('CEP inválido', 400);
     }
@@ -399,19 +409,19 @@ export class PartnerService {
 
     let sum = 0;
     for (let i = 0; i < 9; i++) {
-      sum += parseInt(cpf[i]) * (10 - i);
+      sum += parseInt(cpf.charAt(i)) * (10 - i);
     }
     let digit1 = 11 - (sum % 11);
     if (digit1 > 9) digit1 = 0;
 
     sum = 0;
     for (let i = 0; i < 10; i++) {
-      sum += parseInt(cpf[i]) * (11 - i);
+      sum += parseInt(cpf.charAt(i)) * (11 - i);
     }
     let digit2 = 11 - (sum % 11);
     if (digit2 > 9) digit2 = 0;
 
-    return parseInt(cpf[9]) === digit1 && parseInt(cpf[10]) === digit2;
+    return parseInt(cpf.charAt(9)) === digit1 && parseInt(cpf.charAt(10)) === digit2;
   }
 
   /**
@@ -427,17 +437,17 @@ export class PartnerService {
 
     let sum = 0;
     for (let i = 0; i < 12; i++) {
-      sum += parseInt(cnpj[i]) * weights1[i];
+      sum += parseInt(cnpj.charAt(i)) * weights1[i]!;
     }
     const digit1 = sum % 11 < 2 ? 0 : 11 - (sum % 11);
 
     sum = 0;
     for (let i = 0; i < 13; i++) {
-      sum += parseInt(cnpj[i]) * weights2[i];
+      sum += parseInt(cnpj.charAt(i)) * weights2[i]!;
     }
     const digit2 = sum % 11 < 2 ? 0 : 11 - (sum % 11);
 
-    return parseInt(cnpj[12]) === digit1 && parseInt(cnpj[13]) === digit2;
+    return parseInt(cnpj.charAt(12)) === digit1 && parseInt(cnpj.charAt(13)) === digit2;
   }
 
   /**
@@ -479,7 +489,7 @@ export class PartnerService {
         partner.phone || '',
         partner.document || '',
         partner.type,
-        partner.status,
+        partner.isActive ? 'ATIVO' : 'INATIVO',
         partner.city || '',
         partner.state || '',
         partner.creditLimit || 0,

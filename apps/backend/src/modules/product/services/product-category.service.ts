@@ -346,6 +346,7 @@ export class ProductCategoryService {
       // Verificar se categoria tem produtos
       const productCount = await this.prisma.product.count({
         where: {
+          // 
           categoryId,
           companyId,
           deletedAt: null
@@ -360,6 +361,7 @@ export class ProductCategoryService {
       }
 
       // Verificar se categoria tem subcategorias
+      // 
       const childrenCount = await this.prisma.productCategory.count({
         where: {
           parentId: categoryId,

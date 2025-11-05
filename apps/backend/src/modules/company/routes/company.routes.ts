@@ -29,8 +29,6 @@ export async function companyRoutes(fastify: FastifyInstance) {
     ],
     schema: {
       tags: ['Companies'],
-      summary: 'Criar nova empresa',
-      description: 'Cria uma nova empresa no sistema',
       body: {
         type: 'object',
         required: ['name', 'cnpj', 'email'],
@@ -80,7 +78,7 @@ export async function companyRoutes(fastify: FastifyInstance) {
         }
       }
     }
-  }, async (request: FastifyRequest<{ Body: CreateCompanyDto }>, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const company = await companyService.create(request.body);
       
@@ -113,8 +111,6 @@ export async function companyRoutes(fastify: FastifyInstance) {
     preHandler: [requirePermission('companies:read')],
     schema: {
       tags: ['Companies'],
-      summary: 'Listar empresas',
-      description: 'Lista empresas com filtros e paginação',
       querystring: {
         type: 'object',
         properties: {
@@ -176,11 +172,11 @@ export async function companyRoutes(fastify: FastifyInstance) {
         }
       }
     }
-  }, async (request: FastifyRequest<{ Querystring: CompanyFiltersDto }>, reply: FastifyReply): Promise<void> => {
+  }, async (request: any, reply: FastifyReply): Promise<void> => {
     try {
       const filters: CompanyFiltersDto = {
         name: request.query.name,
-        document: request.query.cnpj,
+        cnpj: request.query.cnpj,
         email: request.query.email,
         city: request.query.city,
         state: request.query.state,
@@ -216,8 +212,6 @@ export async function companyRoutes(fastify: FastifyInstance) {
     preHandler: [requirePermission('companies:read')],
     schema: {
       tags: ['Companies'],
-      summary: 'Buscar empresa por ID',
-      description: 'Busca uma empresa específica pelo ID',
       params: {
         type: 'object',
         required: ['id'],
@@ -265,7 +259,7 @@ export async function companyRoutes(fastify: FastifyInstance) {
         }
       }
     }
-  }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply): Promise<void> => {
+  }, async (request: any, reply: FastifyReply): Promise<void> => {
     try {
       const company = await companyService.findById(request.params.id);
       
@@ -301,8 +295,6 @@ export async function companyRoutes(fastify: FastifyInstance) {
     ],
     schema: {
       tags: ['Companies'],
-      summary: 'Atualizar empresa',
-      description: 'Atualiza os dados de uma empresa',
       params: {
         type: 'object',
         required: ['id'],
@@ -357,7 +349,7 @@ export async function companyRoutes(fastify: FastifyInstance) {
         }
       }
     }
-  }, async (request: FastifyRequest<{ Params: { id: string }; Body: UpdateCompanyDto }>, reply: FastifyReply): Promise<void> => {
+  }, async (request: any, reply: FastifyReply): Promise<void> => {
     try {
       const company = await companyService.update(request.params.id, request.body);
       
@@ -390,8 +382,6 @@ export async function companyRoutes(fastify: FastifyInstance) {
     preHandler: [requirePermission('companies:delete')],
     schema: {
       tags: ['Companies'],
-      summary: 'Remover empresa',
-      description: 'Remove uma empresa do sistema (soft delete)',
       params: {
         type: 'object',
         required: ['id'],
@@ -417,19 +407,11 @@ export async function companyRoutes(fastify: FastifyInstance) {
         }
       }
     }
-  }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply): Promise<void> => {
+  }, async (request: any, reply: FastifyReply): Promise<void> => {
     try {
-      const company = await companyService.delete(request.params.id);
+      await companyService.delete(request.params.id);
       
-      return reply.send({
-        success: true,
-        message: 'Empresa removida com sucesso',
-        data: {
-          id: company.id,
-          name: company.name,
-          isActive: company.isActive
-        }
-      });
+      return reply.status(204).send();
     } catch (error) {
       if (error instanceof AppError) {
         return reply.status(error.statusCode).send({
@@ -454,8 +436,6 @@ export async function companyRoutes(fastify: FastifyInstance) {
     preHandler: [requirePermission('companies:update')],
     schema: {
       tags: ['Companies'],
-      summary: 'Restaurar empresa',
-      description: 'Restaura uma empresa removida',
       params: {
         type: 'object',
         required: ['id'],
@@ -481,7 +461,7 @@ export async function companyRoutes(fastify: FastifyInstance) {
         }
       }
     }
-  }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const company = await companyService.restore(request.params.id);
       
@@ -518,8 +498,7 @@ export async function companyRoutes(fastify: FastifyInstance) {
     preHandler: [requirePermission('companies:read')],
     schema: {
       tags: ['Companies'],
-      summary: 'Estatísticas da empresa',
-      description: 'Busca estatísticas detalhadas da empresa',
+
       params: {
         type: 'object',
         required: ['id'],
@@ -548,7 +527,7 @@ export async function companyRoutes(fastify: FastifyInstance) {
         }
       }
     }
-  }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  }, async (request: any, reply: FastifyReply) => {
     try {
       const stats = await companyService.getStats(request.params.id);
       

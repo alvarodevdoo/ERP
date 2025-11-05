@@ -1,64 +1,32 @@
-import { z } from 'zod';
-
-const configSchema = z.object({
-  // Server
-  PORT: z.string().default('3001').transform(Number),
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  CORS_ORIGIN: z.string().default('http://localhost:5173').transform((val) => val.split(',')),
-
-  // Database
-  DATABASE_URL: z.string(),
-
-  // Redis
-  REDIS_URL: z.string().default('redis://localhost:6379'),
-
-  // JWT
-  JWT_SECRET: z.string(),
-  JWT_EXPIRES_IN: z.string().default('7d'),
-  JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
-
-  // MinIO
-  MINIO_ENDPOINT: z.string().default('localhost'),
-  MINIO_PORT: z.string().default('9000').transform(Number),
-  MINIO_ACCESS_KEY: z.string().default('artplim'),
-  MINIO_SECRET_KEY: z.string().default('artplim123'),
-  MINIO_BUCKET: z.string().default('artplim-files'),
-  MINIO_USE_SSL: z.string().default('false').transform(val => val === 'true'),
-
-  // Email
-  SMTP_HOST: z.string().optional(),
-  SMTP_PORT: z.string().default('587').transform(Number),
-  SMTP_SECURE: z.string().default('false').transform(val => val === 'true'),
-  SMTP_USER: z.string().optional(),
-  SMTP_PASS: z.string().optional(),
-  SMTP_FROM: z.string().default('ArtPlim ERP <noreply@artplim.com>'),
-
-  // Upload
-  MAX_FILE_SIZE: z.string().default('10485760').transform(Number), // 10MB
-  ALLOWED_FILE_TYPES: z.string().default('image/jpeg,image/png,image/gif,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
-
-  // Rate Limiting
-  RATE_LIMIT_MAX: z.string().default('100').transform(Number),
-  RATE_LIMIT_WINDOW: z.string().default('900000').transform(Number), // 15 minutes
-
-  // Logging
-  LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
-});
-
-const parseConfig = () => {
-  try {
-    return configSchema.parse(process.env);
-  } catch (error) {
-    console.error('❌ Invalid environment configuration:');
-    if (error instanceof z.ZodError) {
-      error.errors.forEach((err) => {
-        console.error(`  ${err.path.join('.')}: ${err.message}`);
-      });
-    }
-    process.exit(1);
-  }
+import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
+const config = {
+  PORT: 3001,
+  NODE_ENV: 'development',
+  CORS_ORIGIN: 'http://localhost:5173',
+  DATABASE_URL: 'postgresql://artplim:artplim123@localhost:5432/artplim_erp?schema=public',
+  REDIS_URL: 'redis://localhost:6379',
+  JWT_SECRET: 'bfbaf8c14c6b80c1b5d4b4ef7eebd7546fcda6153e5ce5abfb6f8626650d0bbb',
+  JWT_EXPIRES_IN: '7d',
+  JWT_REFRESH_EXPIRES_IN: '30d',
+  MINIO_ENDPOINT: 'localhost',
+  MINIO_PORT: 9000,
+  MINIO_ACCESS_KEY: 'artplim',
+  MINIO_SECRET_KEY: 'artplim123',
+  MINIO_BUCKET: 'artplim-files',
+  MINIO_USE_SSL: false,
+  SMTP_HOST: undefined,
+  SMTP_PORT: 587,
+  SMTP_SECURE: false,
+  SMTP_USER: undefined,
+  SMTP_PASS: undefined,
+  SMTP_FROM: 'ArtPlim ERP <noreply@artplim.com>',
+  MAX_FILE_SIZE: 10485760,
+  ALLOWED_FILE_TYPES: 'image/jpeg,image/png,image/gif,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  RATE_LIMIT_MAX: 100,
+  RATE_LIMIT_WINDOW: 900000,
+  LOG_LEVEL: 'info',
 };
 
-export const config = parseConfig();
-
-export type Config = typeof config;
+export { config };

@@ -4,19 +4,19 @@ import { z } from 'zod';
  * DTO para criação de empresa
  */
 export const createCompanyDto = z.object({
-  name: z.string({
-    required_error: 'Nome da empresa é obrigatório',
-  }).min(2, 'Nome deve ter pelo menos 2 caracteres').max(100, 'Nome deve ter no máximo 100 caracteres'),
+  name: z.string().min(2, {
+    message: 'Nome deve ter pelo menos 2 caracteres',
+  }).max(100, 'Nome deve ter no máximo 100 caracteres'),
   
   tradeName: z.string().optional(),
   
-  cnpj: z.string({
-    required_error: 'CNPJ é obrigatório',
-  }).min(14, 'CNPJ deve ter 14 caracteres').max(18, 'CNPJ deve ter no máximo 18 caracteres'),
+  cnpj: z.string().min(14, {
+    message: 'CNPJ deve ter 14 caracteres',
+  }).max(18, 'CNPJ deve ter no máximo 18 caracteres'),
   
-  email: z.string({
-    required_error: 'Email é obrigatório',
-  }).email('Email deve ter um formato válido').max(100, 'Email deve ter no máximo 100 caracteres'),
+  email: z.string().email({
+    message: 'Email deve ter um formato válido',
+  }).max(100, 'Email deve ter no máximo 100 caracteres'),
   
   phone: z.string().optional(),
   

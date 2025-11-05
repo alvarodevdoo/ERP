@@ -161,10 +161,9 @@ export interface QuoteReportDTO {
 
 // Interface para conversão em OS
 export interface ConvertToOrderDTO {
-  quoteId: string;
-  deliveryDate?: string;
-  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-  observations?: string;
+  orderId: string;
+  orderNumber: string;
+  message: string;
 }
 
 // Schema para conversão em OS

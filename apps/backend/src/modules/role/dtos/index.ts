@@ -40,11 +40,9 @@ export const roleFiltersDto = z.object({
  */
 export const createPermissionDto = z.object({
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres').max(100, 'Nome deve ter no máximo 100 caracteres'),
-  description: z.string().optional().nullable(),
+  description: z.string().nullable().optional(),
   resource: z.string().min(2, 'Recurso deve ter pelo menos 2 caracteres').max(50, 'Recurso deve ter no máximo 50 caracteres'),
-  action: z.enum(['create', 'read', 'update', 'delete', 'manage'], {
-    errorMap: () => ({ message: 'Ação deve ser: create, read, update, delete ou manage' }),
-  }),
+  action: z.enum(['create', 'read', 'update', 'delete', 'manage']),
   isActive: z.boolean().default(true),
 });
 
@@ -53,11 +51,9 @@ export const createPermissionDto = z.object({
  */
 export const updatePermissionDto = z.object({
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres').max(100, 'Nome deve ter no máximo 100 caracteres').optional(),
-  description: z.string().optional().nullable(),
+  description: z.string().nullable().optional(),
   resource: z.string().min(2, 'Recurso deve ter pelo menos 2 caracteres').max(50, 'Recurso deve ter no máximo 50 caracteres').optional(),
-  action: z.enum(['create', 'read', 'update', 'delete', 'manage'], {
-    errorMap: () => ({ message: 'Ação deve ser: create, read, update, delete ou manage' }),
-  }).optional(),
+  action: z.enum(['create', 'read', 'update', 'delete', 'manage']).optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -86,7 +82,7 @@ export const roleResponseDto = z.object({
   company: z.object({
     id: z.string(),
     name: z.string(),
-    document: z.string(),
+    cnpj: z.string(),
   }),
   permissions: z.array(
     z.object({

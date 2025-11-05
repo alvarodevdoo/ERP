@@ -1,4 +1,4 @@
-import { PrismaClient, Company, Prisma } from '@prisma/client';
+import { PrismaClient, Company, Prisma, $Enums } from '@prisma/client';
 import { prisma } from '../../../database/connection';
 import { logger } from '../../../shared/logger/index';
 import { CreateCompanyDto, UpdateCompanyDto, CompanyFiltersDto } from '../dtos';
@@ -337,17 +337,17 @@ export class CompanyRepository {
         this.db.order.aggregate({
           where: {
             companyId: id,
-            status: 'DELIVERED',
+            status: $Enums.OrderStatus.DELIVERED,
           },
           _sum: {
-            total: true,
+            totalValue: true,
           },
         }),
         this.db.order.count({
           where: {
             companyId: id,
             status: {
-              in: ['PENDING', 'CONFIRMED', 'IN_PRODUCTION'],
+              in: [$Enums.OrderStatus.PENDING, $Enums.OrderStatus.CONFIRMED, $Enums.OrderStatus.IN_PRODUCTION],
             },
           },
         }),
@@ -358,7 +358,7 @@ export class CompanyRepository {
         totalEmployees,
         totalProducts,
         totalOrders,
-        totalRevenue: Number(revenue._sum.total) || 0,
+        totalRevenue: Number(revenue._sum?.totalValue ?? 0),
         activeOrders,
       };
     } catch (error) {

@@ -1,4 +1,5 @@
-import { PrismaClient, Prisma, StockMovementType } from '@prisma/client';
+import { PrismaClient, Prisma, $Enums } from '@prisma/client';
+import type { StockMovementType } from '@prisma/client';
 import {
   CreateStockMovementDto,
   StockMovementResponseDto
@@ -19,9 +20,17 @@ export class StockMovementRepository {
     try {
       const movement = await this.prisma.stockMovement.create({
         data: {
-          ...data,
           companyId,
-          userId
+          userId,
+          // 
+          type: data.type,
+          productId: data.productId,
+          quantity: data.quantity,
+          reason: data.reason,
+          ...(data.notes !== undefined && { notes: data.notes }),
+          ...(data.unitCost !== undefined && { unitCost: data.unitCost }),
+          ...(data.reference !== undefined && { reference: data.reference }),
+          ...(data.variationId !== undefined && { variationId: data.variationId })
         },
         include: {
           product: {
@@ -42,7 +51,7 @@ export class StockMovementRepository {
         }
       });
 
-      return this.formatMovementResponse(movement);
+      return await this.formatMovementResponse(movement);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2003') {
@@ -82,7 +91,7 @@ export class StockMovementRepository {
         }
       });
 
-      return movement ? this.formatMovementResponse(movement) : null;
+      return movement ? await this.formatMovementResponse(movement) : null;
     } catch {
       throw new AppError('Erro ao buscar movimentação', 500);
     }
@@ -167,7 +176,7 @@ export class StockMovementRepository {
       const totalPages = Math.ceil(total / limit);
 
       return {
-        movements: movements.map(movement => this.formatMovementResponse(movement)),
+        movements: await Promise.all(movements.map(movement => this.formatMovementResponse(movement))),
         total,
         page,
         limit,
@@ -215,7 +224,8 @@ export class StockMovementRepository {
         take: limit
       });
 
-      return movements.map(movement => this.formatMovementResponse(movement));
+      // 
+      return Promise.all(movements.map(movement => this.formatMovementResponse(movement)));
     } catch {
       throw new AppError('Erro ao buscar movimentações do produto', 500);
     }
@@ -261,8 +271,7 @@ export class StockMovementRepository {
           createdAt: 'desc'
         }
       });
-
-      return movements.map(movement => this.formatMovementResponse(movement));
+      return Promise.all(movements.map(movement => this.formatMovementResponse(movement)));
     } catch {
       throw new AppError('Erro ao buscar movimentações por período', 500);
     }
@@ -315,7 +324,8 @@ export class StockMovementRepository {
       const typeStats: Record<StockMovementType, number> = {
         IN: 0,
         OUT: 0,
-        ADJUSTMENT: 0
+        ADJUSTMENT: 0,
+        TRANSFER: 0
       };
 
       let totalIn = 0;
@@ -346,7 +356,7 @@ export class StockMovementRepository {
         date: string;
         type: StockMovementType;
         count: bigint;
-      }>>(`
+      }>>`
         SELECT 
           DATE("createdAt") as date,
           type,
@@ -357,41 +367,39 @@ export class StockMovementRepository {
           AND "createdAt" <= ${periodEnd.toISOString()}
         GROUP BY DATE("createdAt"), type
         ORDER BY date DESC
-      `);
+      `;
 
       // Agrupar por data
-      const movementsByDay = dailyMovements.reduce((acc, curr) => {
-        const existing = acc.find(item => item.date === curr.date);
-        const count = Number(curr.count);
-
-        if (existing) {
-          switch (curr.type) {
-            case 'IN':
-              existing.in += count;
-              break;
-            case 'OUT':
-              existing.out += count;
-              break;
-            case 'ADJUSTMENT':
-              existing.adjustment += count;
-              break;
-          }
-        } else {
-          acc.push({
-            date: curr.date,
-            in: curr.type === 'IN' ? count : 0,
-            out: curr.type === 'OUT' ? count : 0,
-            adjustment: curr.type === 'ADJUSTMENT' ? count : 0
-          });
-        }
-
-        return acc;
-      }, [] as Array<{
+      const movementsByDay = dailyMovements.reduce<{
         date: string;
         in: number;
         out: number;
         adjustment: number;
-      }>);
+      }[]>((acc, curr) => {
+        const date = new Date(curr.date).toISOString().split('T')[0];
+        let entry = acc.find(item => item.date === date);
+
+        if (!entry) {
+          entry = { date, in: 0, out: 0, adjustment: 0 };
+          acc.push(entry);
+        }
+
+        const count = Number(curr.count);
+
+        switch (curr.type) {
+          case 'IN':
+            entry.in += count;
+            break;
+          case 'OUT':
+            entry.out += count;
+            break;
+          case 'ADJUSTMENT':
+            entry.adjustment += count;
+            break;
+        }
+
+        return acc;
+      }, []);
 
       return {
         totalMovements,
@@ -399,6 +407,7 @@ export class StockMovementRepository {
         totalOut,
         totalAdjustment,
         movementsByType: typeStats,
+        // 
         movementsByDay
       };
     } catch {
@@ -441,7 +450,8 @@ export class StockMovementRepository {
         take: limit
       });
 
-      return movements.map(movement => this.formatMovementResponse(movement));
+      // 
+      return Promise.all(movements.map(movement => this.formatMovementResponse(movement)));
     } catch {
       throw new AppError('Erro ao buscar movimentações recentes', 500);
     }
@@ -471,14 +481,14 @@ export class StockMovementRepository {
       movements.forEach(movement => {
         switch (movement.type) {
           case 'IN':
-            currentStock += movement.quantity;
+            currentStock += Number(movement.quantity);
             break;
           case 'OUT':
-            currentStock -= movement.quantity;
+            currentStock -= Number(movement.quantity);
             break;
           case 'ADJUSTMENT':
             // Para ajustes, a quantidade pode ser positiva ou negativa
-            currentStock += movement.quantity;
+            currentStock += Number(movement.quantity);
             break;
         }
       });
@@ -492,37 +502,72 @@ export class StockMovementRepository {
   /**
    * Formatar resposta da movimentação
    */
-  private formatMovementResponse(movement: {
-    id: string;
-    productId: string;
-    product: { id: string; name: string; sku: string; unit: string };
-    type: string;
-    quantity: number;
-    unitCost: number | null;
-    totalCost: number | null;
-    reason: string;
-    reference: string | null;
-    userId: string;
-    user: { id: string; name: string; email: string };
-    companyId: string;
-    createdAt: Date;
-    updatedAt: Date;
-  }): StockMovementResponseDto {
+  private async calculateStockBefore(productId: string, companyId: string, beforeDate: Date): Promise<number> {
+    const movements = await this.prisma.stockMovement.findMany({
+      where: {
+        productId,
+        companyId,
+        createdAt: { lt: beforeDate }
+      },
+      select: { type: true, quantity: true }
+    });
+
+    let stock = 0;
+    movements.forEach((m) => {
+      switch (m.type) {
+        case 'IN':
+          stock += Number(m.quantity);
+          break;
+        case 'OUT':
+          stock -= Number(m.quantity);
+          break;
+        case 'ADJUSTMENT':
+          stock += Number(m.quantity);
+          break;
+        case 'TRANSFER':
+          // não altera o total geral de estoque do produto
+          break;
+      }
+    });
+    return Math.max(0, stock);
+  }
+
+  private async formatMovementResponse(movement: any): Promise<StockMovementResponseDto> {
+    const prev = movement.productId
+      ? await this.calculateStockBefore(movement.productId, movement.companyId, movement.createdAt)
+      : 0;
+    const delta = (() => {
+      switch (movement.type) {
+        case 'IN':
+          return Number(movement.quantity);
+        case 'OUT':
+          return -Number(movement.quantity);
+        case 'ADJUSTMENT':
+          return Number(movement.quantity);
+        case 'TRANSFER':
+        default:
+          return 0;
+      }
+    })();
+    const next = Math.max(0, prev + delta);
+
     return {
       id: movement.id,
       productId: movement.productId,
       product: movement.product,
       type: movement.type,
-      quantity: movement.quantity,
-      unitCost: movement.unitCost,
-      totalCost: movement.totalCost,
+      quantity: Number(movement.quantity),
+      unitCost: movement.unitCost ? Number(movement.unitCost) : null,
+      totalCost: movement.totalCost ? Number(movement.totalCost) : null,
       reason: movement.reason,
       reference: movement.reference,
+      previousStock: prev,
+      newStock: next,
       userId: movement.userId,
       user: movement.user,
       companyId: movement.companyId,
       createdAt: movement.createdAt,
-      updatedAt: movement.updatedAt
+      // updatedAt não faz parte do DTO de resposta
     };
   }
 }

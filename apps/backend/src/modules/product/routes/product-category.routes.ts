@@ -44,7 +44,7 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     },
     async (request: FastifyRequest<{ Body: CreateProductCategoryDto }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const category = await categoryService.create(request.body, companyId, userId);
         
         return reply.code(201).send({
@@ -81,18 +81,13 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
       };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
-        const result = await categoryService.findMany(companyId, userId, request.query);
+        const { companyId, userId } = request;
+        const includeInactive = request.query.active === false ? true : false;
+        const result = await categoryService.findMany(companyId, userId, includeInactive);
         
         return reply.send({
           success: true,
-          data: result.categories,
-          meta: {
-            total: result.total,
-            page: result.page,
-            limit: result.limit,
-            totalPages: result.totalPages
-          }
+          data: result
         });
       } catch (error: unknown) {
         return handleError(error, reply);
@@ -109,7 +104,7 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     '/:id',
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const category = await categoryService.findById(request.params.id, companyId, userId);
         
         if (!category) {
@@ -142,7 +137,7 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     },
     async (request: FastifyRequest<{ Params: { id: string }; Body: UpdateProductCategoryDto }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const category = await categoryService.update(
           request.params.id,
           request.body,
@@ -170,7 +165,7 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     '/:id',
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         await categoryService.delete(request.params.id, companyId, userId);
         
         return reply.send({
@@ -192,7 +187,7 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     '/:id/restore',
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const category = await categoryService.restore(request.params.id, companyId, userId);
         
         return reply.send({
@@ -213,7 +208,7 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     '/root',
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const categories = await categoryService.findRootCategories(companyId, userId);
         
         return reply.send({
@@ -235,7 +230,7 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     '/:id/children',
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const children = await categoryService.findChildren(request.params.id, companyId, userId);
         
         return reply.send({
@@ -259,7 +254,7 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
       Querystring: { name: string; parentId?: string; excludeId?: string };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const { name, parentId, excludeId } = request.query;
         
         if (!name) {
@@ -272,8 +267,6 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
         const result = await categoryService.checkNameAvailability(
           name,
           companyId,
-          userId,
-          parentId,
           excludeId
         );
         
@@ -296,7 +289,7 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     '/reorder',
     async (request: FastifyRequest<{ Body: { categoryIds: string[] } }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const { categoryIds } = request.body;
         
         if (!Array.isArray(categoryIds) || categoryIds.length === 0) {
@@ -306,7 +299,8 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
           });
         }
         
-        await categoryService.reorder(categoryIds, companyId, userId);
+        const categoryOrders = categoryIds.map((id, index) => ({ id, sortOrder: index }));
+        await categoryService.reorder(categoryOrders, companyId, userId);
         
         return reply.send({
           success: true,
@@ -325,7 +319,7 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     '/tree',
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const tree = await categoryService.getCategoryTree(companyId, userId);
         
         return reply.send({
@@ -351,7 +345,7 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
       Body: { newParentId?: string };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const { newParentId } = request.body;
         
         const category = await categoryService.moveCategory(
@@ -385,15 +379,14 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
       Body: { name?: string; includeProducts?: boolean };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const { name, includeProducts = false } = request.body;
         
         const category = await categoryService.duplicate(
           request.params.id,
+          name ?? '',
           companyId,
-          userId,
-          name,
-          includeProducts
+          userId
         );
         
         return reply.code(201).send({
@@ -416,7 +409,7 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     '/:id/stats',
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         
         // Buscar categoria
         const category = await categoryService.findById(request.params.id, companyId, userId);
@@ -435,8 +428,6 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
           id: category.id,
           name: category.name,
           totalSubcategories: children.length,
-          // totalProducts: 0, // Implementar quando tiver relação com produtos
-          level: category.level,
           hasChildren: children.length > 0
         };
         

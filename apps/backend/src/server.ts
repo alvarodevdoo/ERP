@@ -3,6 +3,9 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import multipart from '@fastify/multipart';
+import sensible from '@fastify/sensible';
+import swagger from '@fastify/swagger';
+import swaggerUI from '@fastify/swagger-ui';
 import { config } from './config';
 import { prisma } from './database/client';
 import { errorHandler } from './shared/middlewares/error-handler';
@@ -39,6 +42,7 @@ const server = Fastify({
 });
 
 // Register plugins
+server.register(sensible)
 server.register(helmet, {
   contentSecurityPolicy: false,
 });
@@ -65,13 +69,47 @@ server.register(authMiddleware);
 server.register(tenantMiddleware);
 server.register(validationMiddleware);
 
+// Swagger / OpenAPI documentation
+server.register(swagger, {
+  openapi: {
+    openapi: '3.1.0',
+    info: {
+      title: 'ArtPlim ERP API',
+      description: 'Documentação da API do ArtPlim ERP',
+      version: '1.0.0',
+    },
+    servers: [
+      { url: `http://localhost:${config.PORT}`, description: 'Desenvolvimento local' },
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
+    },
+    security: [{ bearerAuth: [] }],
+  },
+});
+
+server.register(swaggerUI, {
+  routePrefix: '/docs',
+  uiConfig: {
+    docExpansion: 'list',
+    deepLinking: true,
+  },
+  staticCSP: true,
+});
+
 // Health check
 server.get('/health', async () => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     return { status: 'ok', timestamp: new Date().toISOString() };
   } catch (error) {
-    server.log.error('Health check failed:', error);
+    server.log.error({ err: error }, 'Health check failed:');
     throw server.httpErrors.serviceUnavailable('Database connection failed');
   }
 });
@@ -93,14 +131,14 @@ server.register(financialRoutes, { prefix: '/api/financial' });
 // Graceful shutdown
 const gracefulShutdown = async (signal: string) => {
   server.log.info(`Received ${signal}, shutting down gracefully...`);
-  
+
   try {
     await server.close();
     await prisma.$disconnect();
     server.log.info('Server closed successfully');
     process.exit(0);
   } catch (error) {
-    server.log.error('Error during shutdown:', error);
+    server.log.error({ err: error }, 'Error during shutdown:');
     process.exit(1);
   }
 };

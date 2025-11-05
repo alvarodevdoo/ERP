@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { AuthService } from '../services/auth.service';
 import { createValidation } from '../../../shared/middlewares/validation';
+import { buildRouteSchema } from '../../../shared/utils/zod-to-json';
 import {
   loginDto,
   registerDto,
@@ -23,6 +24,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   // Login
   fastify.post('/login', {
     preHandler: createValidation({ body: loginDto }),
+    schema: buildRouteSchema({ body: loginDto, tags: ['Auth'] }),
   }, async (request, reply) => {
     try {
       const result = await authService.login(request.body as LoginDto);
@@ -38,6 +40,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   // Register
   fastify.post('/register', {
     preHandler: createValidation({ body: registerDto }),
+    schema: buildRouteSchema({ body: registerDto, tags: ['Auth'] }),
   }, async (request, reply) => {
     try {
       const result = await authService.register(request.body as RegisterDto);
@@ -53,6 +56,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   // Refresh token
   fastify.post('/refresh', {
     preHandler: createValidation({ body: refreshTokenDto }),
+    schema: buildRouteSchema({ body: refreshTokenDto, tags: ['Auth'] }),
   }, async (request, reply) => {
     try {
       const result = await authService.refreshToken(request.body as RefreshTokenDto);
@@ -68,6 +72,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   // Forgot password
   fastify.post('/forgot-password', {
     preHandler: createValidation({ body: forgotPasswordDto }),
+    schema: buildRouteSchema({ body: forgotPasswordDto, tags: ['Auth'] }),
   }, async (request, reply) => {
     try {
       await authService.forgotPassword(request.body as ForgotPasswordDto);
@@ -85,6 +90,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   // Reset password
   fastify.post('/reset-password', {
     preHandler: createValidation({ body: resetPasswordDto }),
+    schema: buildRouteSchema({ body: resetPasswordDto, tags: ['Auth'] }),
   }, async (request, reply) => {
     try {
       await authService.resetPassword(request.body as ResetPasswordDto);
@@ -102,6 +108,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   // Change password (authenticated)
   fastify.post('/change-password', {
     preHandler: createValidation({ body: changePasswordDto }),
+    schema: buildRouteSchema({ body: changePasswordDto, tags: ['Auth'] }),
   }, async (request, reply) => {
     try {
       if (!request.userId) {
@@ -126,6 +133,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   // Update profile (authenticated)
   fastify.put('/profile', {
     preHandler: createValidation({ body: updateProfileDto }),
+    schema: buildRouteSchema({ body: updateProfileDto, tags: ['Auth'] }),
   }, async (request, reply) => {
     try {
       if (!request.userId) {
@@ -135,6 +143,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         });
       }
 
+      // 
       const user = await authService.updateProfile(request.userId, request.body as UpdateProfileDto);
       return reply.send({
         message: 'Profile updated successfully',
@@ -153,7 +162,9 @@ export async function authRoutes(fastify: FastifyInstance) {
   });
 
   // Get current user (authenticated)
-  fastify.get('/me', async (request, reply) => {
+  fastify.get('/me', {
+    schema: { tags: ['Auth'] },
+  }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.status(401).send({
@@ -163,6 +174,8 @@ export async function authRoutes(fastify: FastifyInstance) {
       }
 
       const user = request.user;
+      const hasEmployee = typeof user === 'object' && user !== null && 'employee' in user;
+
       return reply.send({
         user: {
           id: user.id,
@@ -171,11 +184,11 @@ export async function authRoutes(fastify: FastifyInstance) {
           companyId: user.companyId,
           company: user.company,
           // TODO: Implementar sistema de roles/permissions
-          employee: user.employee ? {
-            id: user.employee.id,
-            role: user.employee.role ? {
-              id: user.employee.role.id,
-              name: user.employee.role.name,
+          employee: hasEmployee && (user as any).employee ? {
+            id: (user as any).employee.id,
+            role: (user as any).employee.role ? {
+              id: (user as any).employee.role.id,
+              name: (user as any).employee.role.name,
             } : null,
           } : null,
           isActive: user.isActive,
@@ -191,7 +204,9 @@ export async function authRoutes(fastify: FastifyInstance) {
   });
 
   // Logout (authenticated)
-  fastify.post('/logout', async (request, reply) => {
+  fastify.post('/logout', {
+    schema: { tags: ['Auth'] },
+  }, async (request, reply) => {
     try {
       // In a real implementation, you might want to blacklist the token
       // For now, we'll just return a success message

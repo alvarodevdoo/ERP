@@ -8,7 +8,7 @@ import {
   updatePartnerSchema,
   partnerFiltersSchema
 } from '../dtos';
-import { PartnerType } from '@prisma/client';
+import type { PartnerType } from '@prisma/client';
 import { PartnerService } from '../services';
 import { authMiddleware } from '../../../shared/middlewares/auth';
 import { tenantMiddleware } from '../../../shared/middlewares/tenant';
@@ -32,7 +32,8 @@ export async function partnerRoutes(fastify: FastifyInstance) {
     preHandler: [createValidation({ body: createPartnerSchema })],
     handler: async (request: FastifyRequest<{ Body: CreatePartnerDTO }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
         const partner = await partnerService.create(request.body, userId, companyId);
         
         return reply.code(201).send({
@@ -66,17 +67,18 @@ export async function partnerRoutes(fastify: FastifyInstance) {
     preHandler: [createValidation({ querystring: partnerFiltersSchema })],
     handler: async (request: FastifyRequest<{ Querystring: PartnerFiltersDTO }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
         const result = await partnerService.findMany(request.query, userId, companyId);
         
         return reply.send({
           success: true,
           data: result.partners,
           pagination: {
-            page: result.pagination.page,
-            limit: result.pagination.limit,
-            total: result.pagination.total,
-            totalPages: result.pagination.totalPages
+            page: result.page,
+            limit: result.limit,
+            total: result.total,
+            totalPages: result.totalPages
           }
         });
       } catch (error) {
@@ -104,7 +106,8 @@ export async function partnerRoutes(fastify: FastifyInstance) {
   }>('/:id', {
     handler: async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
         const partner = await partnerService.findById(request.params.id, userId, companyId);
         
         return reply.send({
@@ -138,7 +141,8 @@ export async function partnerRoutes(fastify: FastifyInstance) {
     preHandler: [createValidation({ body: updatePartnerSchema })],
     handler: async (request: FastifyRequest<{ Params: { id: string }; Body: UpdatePartnerDTO }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
         const partner = await partnerService.update(request.params.id, request.body, userId, companyId);
         
         return reply.send({
@@ -171,7 +175,8 @@ export async function partnerRoutes(fastify: FastifyInstance) {
   }>('/:id', {
     handler: async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
         await partnerService.delete(request.params.id, userId, companyId);
         
         return reply.code(204).send();
@@ -200,7 +205,8 @@ export async function partnerRoutes(fastify: FastifyInstance) {
   }>('/:id/restore', {
     handler: async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
         const partner = await partnerService.restore(request.params.id, userId, companyId);
         
         return reply.send({
@@ -230,23 +236,16 @@ export async function partnerRoutes(fastify: FastifyInstance) {
    */
   fastify.get<{
     Params: { type: string };
-    Querystring: Omit<PartnerFiltersDTO, 'type'>;
   }>('/type/:type', {
-    handler: async (request: FastifyRequest<{ Params: { type: string }; Querystring: Omit<PartnerFiltersDTO, 'type'> }>, reply: FastifyReply) => {
+    handler: async (request: FastifyRequest<{ Params: { type: string } }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
-        const filters = { ...request.query, type: request.params.type };
-        const result = await partnerService.findByType(request.params.type as PartnerType, filters, userId, companyId);
+        const userId = request.userId!;
+        const companyId = request.companyId!;
+        const result = await partnerService.findByType(request.params.type as PartnerType, userId, companyId);
         
         return reply.send({
           success: true,
-          data: result.partners,
-          pagination: {
-            page: result.pagination.page,
-            limit: result.pagination.limit,
-            total: result.pagination.total,
-            totalPages: result.pagination.totalPages
-          }
+          data: result
         });
       } catch (error) {
         if (error instanceof AppError) {
@@ -271,7 +270,8 @@ export async function partnerRoutes(fastify: FastifyInstance) {
   fastify.get('/stats', {
     handler: async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
         const stats = await partnerService.getStats(userId, companyId);
         
         return reply.send({
@@ -303,7 +303,8 @@ export async function partnerRoutes(fastify: FastifyInstance) {
   }>('/check-document', {
     handler: async (request: FastifyRequest<{ Querystring: { document: string; excludeId?: string } }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
         const { document, excludeId } = request.query;
         
         if (!document) {
@@ -341,21 +342,22 @@ export async function partnerRoutes(fastify: FastifyInstance) {
    */
   fastify.patch<{
     Params: { id: string };
-    Body: { status: string };
+    Body: { isActive: boolean };
   }>('/:id/status', {
-    handler: async (request: FastifyRequest<{ Params: { id: string }; Body: { status: string } }>, reply: FastifyReply) => {
+    handler: async (request: FastifyRequest<{ Params: { id: string }; Body: { isActive: boolean } }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
-        const { status } = request.body;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
+        const { isActive } = request.body;
         
-        if (!status) {
+        if (typeof isActive !== 'boolean') {
           return reply.code(400).send({
             success: false,
-            message: 'Status é obrigatório'
+            message: 'isActive é obrigatório como boolean'
           });
         }
         
-        const partner = await partnerService.updateStatus(request.params.id, status as string, userId, companyId);
+        const partner = await partnerService.updateStatus(request.params.id, isActive, userId, companyId);
         
         return reply.send({
           success: true,
@@ -387,10 +389,11 @@ export async function partnerRoutes(fastify: FastifyInstance) {
   }>('/report', {
     handler: async (request: FastifyRequest<{ Querystring: PartnerFiltersDTO & { format?: 'json' | 'csv' } }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
         const { format = 'json', ...filters } = request.query;
         
-        const report = await partnerService.generateReport(filters, format, userId, companyId);
+        const report = await partnerService.generateReport(filters, userId, companyId, format);
         
         if (format === 'csv') {
           return reply

@@ -266,7 +266,6 @@ export async function employeeRoutes(fastify: FastifyInstance) {
         
         const employees = await employeeService.findByDepartment(
           request.params.department,
-          { page, limit },
           companyId,
           userId
         );
@@ -309,7 +308,6 @@ export async function employeeRoutes(fastify: FastifyInstance) {
         
         const employees = await employeeService.findByPosition(
           request.params.position,
-          { page, limit },
           companyId,
           userId
         );
@@ -396,7 +394,6 @@ export async function employeeRoutes(fastify: FastifyInstance) {
         
         const employees = await employeeService.findRecentHires(
           days,
-          limit,
           companyId,
           userId
         );
@@ -480,16 +477,16 @@ export async function employeeRoutes(fastify: FastifyInstance) {
         const { format = 'json', ...filters } = request.query;
         
         const report = await employeeService.findForReport(
-          filters,
           companyId,
-          userId
+          userId,
+          filters
         );
         
         if (format === 'csv') {
           // Converter para CSV
-          const csvHeader = 'Nome,CPF,Email,Cargo,Departamento,Salário,Status,Data Admissão\n';
+          const csvHeader = 'Nome,Email,Cargo,Departamento,Salário,Status,Data Admissão\n';
           const csvData = report.map(emp => 
-            `${emp.name},${emp.cpf},${emp.email},${emp.position},${emp.department},${emp.salary},${emp.status},${emp.hiredAt}`
+            `${emp.user?.name ?? ''},${emp.user?.email ?? ''},${emp.position ?? ''},${emp.department ?? ''},${emp.salary ?? ''},${emp.isActive ? 'ativo' : 'inativo'},${emp.hireDate ?? ''}`
           ).join('\n');
           
           reply

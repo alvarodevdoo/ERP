@@ -3,7 +3,7 @@ import { z } from 'zod';
 // Schemas de validação
 export const createOrderSchema = z.object({
   quoteId: z.string().uuid().optional(),
-  customerId: z.string().uuid(),
+  partnerId: z.string().uuid(),
   title: z.string().min(1, 'Título é obrigatório').max(255),
   description: z.string().optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
@@ -26,7 +26,7 @@ export const createOrderSchema = z.object({
 });
 
 export const updateOrderSchema = z.object({
-  customerId: z.string().uuid().optional(),
+  partnerId: z.string().uuid().optional(),
   title: z.string().min(1).max(255).optional(),
   description: z.string().optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
@@ -50,7 +50,7 @@ export const updateOrderSchema = z.object({
 
 export const orderFiltersSchema = z.object({
   search: z.string().optional(),
-  customerId: z.string().uuid().optional(),
+  partnerId: z.string().uuid().optional(),
   status: z.enum(['PENDING', 'IN_PROGRESS', 'PAUSED', 'COMPLETED', 'CANCELLED']).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
   startDate: z.string().datetime().optional(),
@@ -163,9 +163,9 @@ export interface OrderResponseDTO {
   number: string;
   quoteId?: string;
   quoteNumber?: string;
-  customerId: string;
-  customerName: string;
-  customerDocument: string;
+  partnerId: string;
+  partnerName: string;
+  partnerDocument: string;
   title: string;
   description?: string;
   status: 'PENDING' | 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';

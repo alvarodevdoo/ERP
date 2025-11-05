@@ -19,40 +19,18 @@ export class PartnerContactRepository {
         where: {
           id: data.partnerId,
           companyId,
-          deletedAt: null
+          // deletedAt não existe no schema atual
         }
       });
 
       if (!partner) {
         throw new AppError('Parceiro não encontrado', 404);
       }
-
-      // Se for contato primário, remove a flag dos outros contatos
-      if (data.isPrimary) {
-        await this.prisma.partnerContact.updateMany({
-          where: {
-            partnerId: data.partnerId,
-            isPrimary: true
-          },
-          data: {
-            isPrimary: false
-          }
-        });
-      }
-
-      const contact = await this.prisma.partnerContact.create({
-        data
-      });
-
-      return this.formatContactResponse(contact);
+      // Como PartnerContact não existe no schema, retornar erro explícito
+      throw new AppError('Gerenciamento de contatos não suportado no schema atual', 501);
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
-      }
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === 'P2002') {
-          throw new AppError('Já existe um contato com este email para este parceiro', 409);
-        }
       }
       throw new AppError('Erro ao criar contato', 500);
     }
@@ -63,17 +41,8 @@ export class PartnerContactRepository {
    */
   async findById(id: string, companyId: string): Promise<PartnerContactResponseDTO | null> {
     try {
-      const contact = await this.prisma.partnerContact.findFirst({
-        where: {
-          id,
-          partner: {
-            companyId,
-            deletedAt: null
-          }
-        }
-      });
-
-      return contact ? this.formatContactResponse(contact) : null;
+      // Não suportado no schema atual
+      throw new AppError('Gerenciamento de contatos não suportado no schema atual', 501);
     } catch (_error) {
       throw new AppError('Erro ao buscar contato', 500);
     }
@@ -89,25 +58,15 @@ export class PartnerContactRepository {
         where: {
           id: partnerId,
           companyId,
-          deletedAt: null
+          // deletedAt não existe no schema atual
         }
       });
 
       if (!partner) {
         throw new AppError('Parceiro não encontrado', 404);
       }
-
-      const contacts = await this.prisma.partnerContact.findMany({
-        where: {
-          partnerId
-        },
-        orderBy: [
-          { isPrimary: 'desc' },
-          { name: 'asc' }
-        ]
-      });
-
-      return contacts.map(contact => this.formatContactResponse(contact));
+      // Não suportado no schema atual
+      return [];
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
@@ -121,52 +80,11 @@ export class PartnerContactRepository {
    */
   async update(id: string, data: UpdatePartnerContactDTO, companyId: string): Promise<PartnerContactResponseDTO> {
     try {
-      // Verifica se o contato existe e o parceiro pertence à empresa
-      const existingContact = await this.prisma.partnerContact.findFirst({
-        where: {
-          id,
-          partner: {
-            companyId,
-            deletedAt: null
-          }
-        }
-      });
-
-      if (!existingContact) {
-        throw new AppError('Contato não encontrado', 404);
-      }
-
-      // Se for contato primário, remove a flag dos outros contatos
-      if (data.isPrimary) {
-        await this.prisma.partnerContact.updateMany({
-          where: {
-            partnerId: existingContact.partnerId,
-            isPrimary: true,
-            id: { not: id }
-          },
-          data: {
-            isPrimary: false
-          }
-        });
-      }
-
-      const contact = await this.prisma.partnerContact.update({
-        where: { id },
-        data
-      });
-
-      return this.formatContactResponse(contact);
+      // Não suportado no schema atual
+      throw new AppError('Gerenciamento de contatos não suportado no schema atual', 501);
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
-      }
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === 'P2025') {
-          throw new AppError('Contato não encontrado', 404);
-        }
-        if (error.code === 'P2002') {
-          throw new AppError('Já existe um contato com este email para este parceiro', 409);
-        }
       }
       throw new AppError('Erro ao atualizar contato', 500);
     }
@@ -177,32 +95,11 @@ export class PartnerContactRepository {
    */
   async delete(id: string, companyId: string): Promise<void> {
     try {
-      // Verifica se o contato existe e o parceiro pertence à empresa
-      const contact = await this.prisma.partnerContact.findFirst({
-        where: {
-          id,
-          partner: {
-            companyId,
-            deletedAt: null
-          }
-        }
-      });
-
-      if (!contact) {
-        throw new AppError('Contato não encontrado', 404);
-      }
-
-      await this.prisma.partnerContact.delete({
-        where: { id }
-      });
+      // Não suportado no schema atual
+      throw new AppError('Gerenciamento de contatos não suportado no schema atual', 501);
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
-      }
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === 'P2025') {
-          throw new AppError('Contato não encontrado', 404);
-        }
       }
       throw new AppError('Erro ao excluir contato', 500);
     }
@@ -213,41 +110,8 @@ export class PartnerContactRepository {
    */
   async setPrimary(id: string, companyId: string): Promise<PartnerContactResponseDTO> {
     try {
-      // Verifica se o contato existe e o parceiro pertence à empresa
-      const existingContact = await this.prisma.partnerContact.findFirst({
-        where: {
-          id,
-          partner: {
-            companyId,
-            deletedAt: null
-          }
-        }
-      });
-
-      if (!existingContact) {
-        throw new AppError('Contato não encontrado', 404);
-      }
-
-      // Remove a flag primário dos outros contatos
-      await this.prisma.partnerContact.updateMany({
-        where: {
-          partnerId: existingContact.partnerId,
-          isPrimary: true
-        },
-        data: {
-          isPrimary: false
-        }
-      });
-
-      // Define este contato como primário
-      const contact = await this.prisma.partnerContact.update({
-        where: { id },
-        data: {
-          isPrimary: true
-        }
-      });
-
-      return this.formatContactResponse(contact);
+      // Não suportado no schema atual
+      throw new AppError('Gerenciamento de contatos não suportado no schema atual', 501);
     } catch (_error) {
       if (_error instanceof AppError) {
         throw _error;
@@ -266,22 +130,15 @@ export class PartnerContactRepository {
         where: {
           id: partnerId,
           companyId,
-          deletedAt: null
+          // deletedAt não existe no schema atual
         }
       });
 
       if (!partner) {
         throw new AppError('Parceiro não encontrado', 404);
       }
-
-      const contact = await this.prisma.partnerContact.findFirst({
-        where: {
-          partnerId,
-          isPrimary: true
-        }
-      });
-
-      return contact ? this.formatContactResponse(contact) : null;
+      // Não suportado no schema atual
+      return null;
     } catch (_error) {
       if (_error instanceof AppError) {
         throw _error;
@@ -295,15 +152,8 @@ export class PartnerContactRepository {
    */
   async emailExists(email: string, partnerId: string, excludeId?: string): Promise<boolean> {
     try {
-      const contact = await this.prisma.partnerContact.findFirst({
-        where: {
-          email,
-          partnerId,
-          ...(excludeId && { id: { not: excludeId } })
-        }
-      });
-
-      return !!contact;
+      // Não suportado no schema atual
+      return false;
     } catch (_error) {
       throw new AppError('Erro ao verificar email', 500);
     }
@@ -312,19 +162,8 @@ export class PartnerContactRepository {
   /**
    * Formata resposta do contato
    */
-  private formatContactResponse(contact: PartnerContact): PartnerContactResponseDTO {
-    return {
-      id: contact.id,
-      partnerId: contact.partnerId,
-      name: contact.name,
-      email: contact.email,
-      phone: contact.phone,
-      position: contact.position,
-      department: contact.department,
-      isPrimary: contact.isPrimary,
-      notes: contact.notes,
-      createdAt: contact.createdAt,
-      updatedAt: contact.updatedAt
-    };
+  private formatContactResponse(_contact: any): PartnerContactResponseDTO {
+    // Método legado não suportado no schema atual
+    throw new AppError('Gerenciamento de contatos não suportado no schema atual', 501);
   }
 }

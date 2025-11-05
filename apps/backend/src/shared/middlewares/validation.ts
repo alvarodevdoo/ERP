@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { z, ZodSchema } from 'zod';
+import { z, ZodSchema, ZodError } from 'zod';
 
 interface ValidationSchemas {
   body?: ZodSchema;
@@ -11,7 +11,8 @@ interface ValidationSchemas {
 export async function validationMiddleware(fastify: FastifyInstance) {
   // Register validation decorator
   fastify.decorate('validate', (schemas: ValidationSchemas) => {
-    return async (request: FastifyRequest, reply: FastifyReply) => {
+    // 
+    return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       try {
         // Validate request body
         if (schemas.body && request.body) {
@@ -28,22 +29,22 @@ export async function validationMiddleware(fastify: FastifyInstance) {
           request.query = schemas.querystring.parse(request.query);
         }
 
-        // Validate headers
+        // Validate headers (do not reassign request.headers, just parse to validate)
         if (schemas.headers && request.headers) {
-          request.headers = schemas.headers.parse(request.headers);
+          schemas.headers.parse(request.headers);
         }
       } catch (error) {
         if (error instanceof z.ZodError) {
-          return reply.status(400).send({
+          reply.status(400).send({
             error: 'Validation Error',
             message: 'Invalid request data',
-            details: error.errors.map(err => ({
+            details: error.issues.map(err => ({
               field: err.path.join('.'),
               message: err.message,
               code: err.code,
-              received: err.received,
             })),
           });
+          return;
         }
         throw error;
       }
@@ -83,7 +84,8 @@ export const commonSchemas = {
 
 // Helper function to create validation middleware
 export function createValidation(schemas: ValidationSchemas) {
-  return async (request: FastifyRequest, reply: FastifyReply) => {
+  // 
+  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     try {
       // Validate request body
       if (schemas.body && request.body) {
@@ -100,24 +102,29 @@ export function createValidation(schemas: ValidationSchemas) {
         request.query = schemas.querystring.parse(request.query);
       }
 
-      // Validate headers
+      // Validate headers (do not reassign request.headers, just parse to validate)
       if (schemas.headers && request.headers) {
-        request.headers = schemas.headers.parse(request.headers);
+        schemas.headers.parse(request.headers);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof z.ZodError) {
-        return reply.status(400).send({
-          error: 'Validation Error',
-          message: 'Invalid request data',
-          details: error.errors.map(err => ({
-            field: err.path.join('.'),
-            message: err.message,
-            code: err.code,
-            received: err.received,
-          })),
+        reply.status(400).send({
+          success: false,
+          message: 'Erro de validação',
+          errors: error.issues.map(err => ({
+            path: err.path.join('.'),
+            message: err.message
+          }))
         });
+        return;
       }
-      throw error;
+      
+      reply.status(500).send({
+        success: false,
+        message: 'Erro interno de validação',
+        error: error instanceof Error ? error.message : 'Erro desconhecido'
+      });
+      return;
     }
   };
 }

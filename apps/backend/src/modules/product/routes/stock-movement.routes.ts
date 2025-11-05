@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { PrismaClient, StockMovementType } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+import type { StockMovementType } from '@prisma/client';
 import {
   CreateStockMovementDto,
   createStockMovementDto
@@ -45,7 +46,7 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
     },
     async (request: FastifyRequest<{ Body: CreateStockMovementDto }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const movement = await stockMovementService.create(request.body, companyId, userId);
         
         return reply.code(201).send({
@@ -86,7 +87,7 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
       };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const filters = {
           ...request.query,
           startDate: request.query.startDate ? new Date(request.query.startDate) : undefined,
@@ -120,7 +121,7 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
     '/:id',
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const movement = await stockMovementService.findById(request.params.id, companyId, userId);
         
         if (!movement) {
@@ -153,7 +154,7 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
       Querystring: { limit?: number };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const { limit = 50 } = request.query;
         
         const movements = await stockMovementService.findByProduct(
@@ -192,7 +193,7 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
       };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const { startDate, endDate, type } = request.query;
         
         if (!startDate || !endDate) {
@@ -237,7 +238,7 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
       };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const { startDate, endDate } = request.query;
         
         const stats = await stockMovementService.getStats(
@@ -268,7 +269,7 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
       Querystring: { limit?: number };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const { limit = 10 } = request.query;
         
         const movements = await stockMovementService.findRecent(companyId, userId, limit);
@@ -306,7 +307,7 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
       };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const { productId, quantity, unitCost, reason, reference } = request.body;
         
         // Validações básicas
@@ -361,7 +362,7 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
       };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const { productId, quantity, unitCost, reason, reference } = request.body;
         
         // Validações básicas
@@ -412,7 +413,7 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
       };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const { productId, newQuantity, reason } = request.body;
         
         // Validações básicas
@@ -470,7 +471,7 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
       };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const { fromProductId, toProductId, quantity, reason } = request.body;
         
         // Validações básicas
@@ -524,7 +525,7 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
     '/current-stock/:productId',
     async (request: FastifyRequest<{ Params: { productId: string } }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const result = await stockMovementService.calculateCurrentStock(
           request.params.productId,
           companyId,
@@ -564,7 +565,7 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
       };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const filters = {
           ...request.query,
           startDate: request.query.startDate ? new Date(request.query.startDate) : undefined,

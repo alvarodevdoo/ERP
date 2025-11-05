@@ -13,8 +13,12 @@ const start = async () => {
     logger.info(`🚀 Server running on http://localhost:${config.PORT}`);
     logger.info(`📊 Environment: ${config.NODE_ENV}`);
     logger.info(`🔗 CORS Origin: ${config.CORS_ORIGIN}`);
-  } catch (error) {
-    logger.error(error, 'Falha ao iniciar o servidor');
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      logger.error({ err: error, stack: error.stack }, 'Falha ao iniciar o servidor');
+    } else {
+      logger.error({ err: error as any }, 'Falha ao iniciar o servidor');
+    }
     process.exit(1);
   }
 };

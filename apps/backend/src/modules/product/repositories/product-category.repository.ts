@@ -18,6 +18,7 @@ export class ProductCategoryRepository {
    */
   async create(data: CreateProductCategoryDto, companyId: string): Promise<ProductCategoryResponseDto> {
     try {
+      // 
       const category = await this.prisma.productCategory.create({
         data: {
           ...data,
@@ -79,6 +80,7 @@ export class ProductCategoryRepository {
    */
   async findById(id: string, companyId: string): Promise<ProductCategoryResponseDto | null> {
     try {
+      // 
       const category = await this.prisma.productCategory.findFirst({
         where: {
           id,
@@ -133,6 +135,7 @@ export class ProductCategoryRepository {
    */
   async findMany(companyId: string, includeInactive = false): Promise<ProductCategoryResponseDto[]> {
     try {
+      // 
       const categories = await this.prisma.productCategory.findMany({
         where: {
           companyId,
@@ -191,6 +194,7 @@ export class ProductCategoryRepository {
    */
   async findRootCategories(companyId: string): Promise<ProductCategoryResponseDto[]> {
     try {
+      // 
       const categories = await this.prisma.productCategory.findMany({
         where: {
           companyId,
@@ -245,6 +249,7 @@ export class ProductCategoryRepository {
    */
   async findChildren(parentId: string, companyId: string): Promise<ProductCategoryResponseDto[]> {
     try {
+      // 
       const categories = await this.prisma.productCategory.findMany({
         where: {
           parentId,
@@ -318,6 +323,7 @@ export class ProductCategoryRepository {
         }
       }
 
+      // 
       const category = await this.prisma.productCategory.update({
         where: {
           id,
@@ -393,6 +399,7 @@ export class ProductCategoryRepository {
       // Verificar se a categoria tem produtos
       const productCount = await this.prisma.product.count({
         where: {
+          // 
           categoryId: id,
           companyId,
           deletedAt: null
@@ -404,6 +411,7 @@ export class ProductCategoryRepository {
       }
 
       // Verificar se a categoria tem subcategorias
+      // 
       const childrenCount = await this.prisma.productCategory.count({
         where: {
           parentId: id,
@@ -416,6 +424,7 @@ export class ProductCategoryRepository {
         throw new AppError('Não é possível deletar categoria que possui subcategorias', 400);
       }
 
+      // 
       await this.prisma.productCategory.update({
         where: {
           id,
@@ -445,6 +454,7 @@ export class ProductCategoryRepository {
    */
   async restore(id: string, companyId: string): Promise<ProductCategoryResponseDto> {
     try {
+      // 
       const category = await this.prisma.productCategory.update({
         where: {
           id,
@@ -508,6 +518,7 @@ export class ProductCategoryRepository {
    */
   async nameExists(name: string, companyId: string, excludeId?: string): Promise<boolean> {
     try {
+      // 
       const category = await this.prisma.productCategory.findFirst({
         where: {
           name,
@@ -529,6 +540,7 @@ export class ProductCategoryRepository {
   async reorder(categoryOrders: { id: string; sortOrder: number }[], companyId: string): Promise<void> {
     try {
       const updatePromises = categoryOrders.map(({ id, sortOrder }) =>
+        // 
         this.prisma.productCategory.update({
           where: {
             id,
@@ -567,6 +579,7 @@ export class ProductCategoryRepository {
 
         visited.add(currentParentId);
 
+        // 
         const parent = await this.prisma.productCategory.findFirst({
           where: {
             id: currentParentId,

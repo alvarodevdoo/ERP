@@ -46,7 +46,7 @@ export async function productRoutes(fastify: FastifyInstance) {
     },
     async (request: FastifyRequest<{ Body: CreateProductDto }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const product = await productService.create(request.body, companyId, userId);
         
         return reply.code(201).send({
@@ -72,8 +72,8 @@ export async function productRoutes(fastify: FastifyInstance) {
     },
     async (request: FastifyRequest<{ Querystring: ProductFiltersDto }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
-        const result = await productService.findMany(companyId, userId, request.query);
+        const { companyId, userId } = request;
+        const result = await productService.findMany(request.query, companyId, userId);
         
         return reply.send({
           success: true,
@@ -100,7 +100,7 @@ export async function productRoutes(fastify: FastifyInstance) {
     '/:id',
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const product = await productService.findById(request.params.id, companyId, userId);
         
         if (!product) {
@@ -133,7 +133,7 @@ export async function productRoutes(fastify: FastifyInstance) {
     },
     async (request: FastifyRequest<{ Params: { id: string }; Body: UpdateProductDto }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const product = await productService.update(
           request.params.id,
           request.body,
@@ -161,7 +161,7 @@ export async function productRoutes(fastify: FastifyInstance) {
     '/:id',
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         await productService.delete(request.params.id, companyId, userId);
         
         return reply.send({
@@ -183,7 +183,7 @@ export async function productRoutes(fastify: FastifyInstance) {
     '/:id/restore',
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const product = await productService.restore(request.params.id, companyId, userId);
         
         return reply.send({
@@ -210,25 +210,18 @@ export async function productRoutes(fastify: FastifyInstance) {
       Querystring: { page?: number; limit?: number; includeSubcategories?: boolean };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const { page = 1, limit = 20, includeSubcategories = false } = request.query;
         
-        const result = await productService.findByCategory(
+        const products = await productService.findByCategory(
           request.params.categoryId,
           companyId,
-          userId,
-          { page, limit, includeSubcategories }
+          userId
         );
-        
+
         return reply.send({
           success: true,
-          data: result.products,
-          meta: {
-            total: result.total,
-            page: result.page,
-            limit: result.limit,
-            totalPages: result.totalPages
-          }
+          data: products
         });
       } catch (error: unknown) {
         return handleError(error, reply);
@@ -243,7 +236,7 @@ export async function productRoutes(fastify: FastifyInstance) {
     '/low-stock',
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const products = await productService.findLowStock(companyId, userId);
         
         return reply.send({
@@ -263,7 +256,7 @@ export async function productRoutes(fastify: FastifyInstance) {
     '/out-of-stock',
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const products = await productService.findOutOfStock(companyId, userId);
         
         return reply.send({
@@ -283,7 +276,7 @@ export async function productRoutes(fastify: FastifyInstance) {
     '/stats',
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const stats = await productService.getStats(companyId, userId);
         
         return reply.send({
@@ -309,7 +302,7 @@ export async function productRoutes(fastify: FastifyInstance) {
       Body: { stock: number };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const { stock } = request.body;
         
         if (typeof stock !== 'number' || stock < 0) {
@@ -350,7 +343,7 @@ export async function productRoutes(fastify: FastifyInstance) {
       Body: { adjustment: number; reason: string };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const { adjustment, reason } = request.body;
         
         if (typeof adjustment !== 'number' || adjustment === 0) {
@@ -397,7 +390,7 @@ export async function productRoutes(fastify: FastifyInstance) {
       Querystring: { sku: string; excludeId?: string };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
+        const { companyId, userId } = request;
         const { sku, excludeId } = request.query;
         
         if (!sku) {
@@ -410,7 +403,6 @@ export async function productRoutes(fastify: FastifyInstance) {
         const result = await productService.checkSkuAvailability(
           sku,
           companyId,
-          userId,
           excludeId
         );
         
@@ -449,10 +441,20 @@ export async function productRoutes(fastify: FastifyInstance) {
       };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request.user;
-        const report = await productService.findForReport(companyId, userId, request.query);
-        
-        if (request.query.format === 'csv') {
+        const { companyId, userId } = request;
+        const { categoryId, active, lowStock, format } = request.query;
+        const filters: ProductFiltersDto = {
+          page: 1,
+          limit: 100,
+          sortBy: 'name',
+          sortOrder: 'asc',
+          ...(categoryId ? { categoryId } : {}),
+          ...(active !== undefined ? { isActive: active } : {}),
+          ...(lowStock !== undefined ? { lowStock } : {}),
+        };
+        const report = await productService.findForReport(filters, companyId, userId);
+
+        if (format === 'csv') {
           reply.header('Content-Type', 'text/csv');
           reply.header('Content-Disposition', 'attachment; filename="produtos.csv"');
           return reply.send(report);

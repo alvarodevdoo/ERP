@@ -30,21 +30,14 @@ export class PermissionService {
         throw new AppError(`Já existe uma permissão para o recurso '${data.resource}' com a ação '${data.action}'`, 400);
       }
 
+      // 
       const permission = await this.permissionRepository.create(data);
 
-      logger.info('Permissão criada com sucesso', {
-        permissionId: permission.id,
-        name: permission.name,
-        resource: permission.resource,
-        action: permission.action,
-      });
+      logger.info('Permissão criada com sucesso');
 
       return permission;
     } catch (error) {
-      logger.error('Erro ao criar permissão', {
-        error: error instanceof Error ? error.message : 'Erro desconhecido',
-        data,
-      });
+      logger.error('Erro ao criar permissão');
       throw error;
     }
   }
@@ -105,21 +98,11 @@ export class PermissionService {
 
       const permission = await this.permissionRepository.update(id, data);
 
-      logger.info('Permissão atualizada com sucesso', {
-        permissionId: permission.id,
-        name: permission.name,
-        resource: permission.resource,
-        action: permission.action,
-        updatedFields: Object.keys(data),
-      });
+      logger.info('Permissão atualizada com sucesso');
 
       return permission;
     } catch (error) {
-      logger.error('Erro ao atualizar permissão', {
-        error: error instanceof Error ? error.message : 'Erro desconhecido',
-        permissionId: id,
-        data,
-      });
+      logger.error('Erro ao atualizar permissão');
       throw error;
     }
   }
@@ -141,17 +124,9 @@ export class PermissionService {
 
       await this.permissionRepository.delete(id);
 
-      logger.info('Permissão removida com sucesso', {
-        permissionId: id,
-        name: permission.name,
-        resource: permission.resource,
-        action: permission.action,
-      });
+      logger.info('Permissão removida com sucesso');
     } catch (error) {
-      logger.error('Erro ao remover permissão', {
-        error: error instanceof Error ? error.message : 'Erro desconhecido',
-        permissionId: id,
-      });
+      logger.error('Erro ao remover permissão');
       throw error;
     }
   }
@@ -198,16 +173,11 @@ export class PermissionService {
     try {
       const createdPermissions = await this.permissionRepository.createDefaultPermissions();
 
-      logger.info('Permissões padrão criadas com sucesso', {
-        count: createdPermissions.length,
-        permissions: createdPermissions.map(p => `${p.resource}:${p.action}`),
-      });
+      logger.info('Permissões padrão criadas com sucesso');
 
       return createdPermissions;
     } catch (error) {
-      logger.error('Erro ao criar permissões padrão', {
-        error: error instanceof Error ? error.message : 'Erro desconhecido',
-      });
+      logger.error('Erro ao criar permissões padrão');
       throw error;
     }
   }
@@ -231,10 +201,7 @@ export class PermissionService {
         permissions,
       };
     } catch (error) {
-      logger.error('Erro ao validar IDs de permissões', {
-        error: error instanceof Error ? error.message : 'Erro desconhecido',
-        permissionIds,
-      });
+      logger.error('Erro ao validar IDs de permissões');
       throw error;
     }
   }
@@ -246,7 +213,7 @@ export class PermissionService {
     try {
       const permissions = await this.permissionRepository.findAllActive();
       
-      const grouped = permissions.reduce((acc, permission) => {
+      const grouped = permissions.reduce((acc: Record<string, Permission[]>, permission) => {
         if (!acc[permission.resource]) {
           acc[permission.resource] = [];
         }
@@ -256,14 +223,15 @@ export class PermissionService {
 
       // Ordena as permissões dentro de cada recurso por ação
       Object.keys(grouped).forEach(resource => {
-        grouped[resource].sort((a, b) => a.action.localeCompare(b.action));
+        const resourceGroup = grouped[resource];
+        if (resourceGroup) {
+          resourceGroup.sort((a, b) => a.action.localeCompare(b.action));
+        }
       });
 
       return grouped;
     } catch (error) {
-      logger.error('Erro ao buscar permissões agrupadas por recurso', {
-        error: error instanceof Error ? error.message : 'Erro desconhecido',
-      });
+      logger.error('Erro ao buscar permissões agrupadas por recurso');
       throw error;
     }
   }
@@ -284,10 +252,7 @@ export class PermissionService {
       const result = await this.permissionRepository.findMany(filters);
       return result.data;
     } catch (error) {
-      logger.error('Erro ao buscar permissões por nome', {
-        error: error instanceof Error ? error.message : 'Erro desconhecido',
-        searchTerm,
-      });
+      logger.error('Erro ao buscar permissões por nome');
       throw error;
     }
   }
@@ -297,7 +262,7 @@ export class PermissionService {
    */
   async canDelete(id: string): Promise<{
     canDelete: boolean;
-    reason?: string;
+    reason?: string | undefined;
     rolesCount: number;
   }> {
     try {
@@ -319,10 +284,7 @@ export class PermissionService {
         rolesCount: permission._count.roles,
       };
     } catch (error) {
-      logger.error('Erro ao verificar se permissão pode ser removida', {
-        error: error instanceof Error ? error.message : 'Erro desconhecido',
-        permissionId: id,
-      });
+      logger.error('Erro ao verificar se permissão pode ser removida');
       throw error;
     }
   }
@@ -381,9 +343,7 @@ export class PermissionService {
         mostUsed,
       };
     } catch (error) {
-      logger.error('Erro ao obter estatísticas de permissões', {
-        error: error instanceof Error ? error.message : 'Erro desconhecido',
-      });
+      logger.error('Erro ao obter estatísticas de permissões');
       throw error;
     }
   }

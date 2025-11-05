@@ -29,7 +29,8 @@ export async function partnerContactRoutes(fastify: FastifyInstance) {
     preHandler: [createValidation({ body: createPartnerContactSchema })],
     handler: async (request: FastifyRequest<{ Body: CreatePartnerContactDTO }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
         const contact = await partnerContactService.create(request.body, userId, companyId);
         
         return reply.code(201).send({
@@ -62,7 +63,8 @@ export async function partnerContactRoutes(fastify: FastifyInstance) {
   }>('/:id', {
     handler: async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
         const contact = await partnerContactService.findById(request.params.id, userId, companyId);
         
         return reply.send({
@@ -94,7 +96,8 @@ export async function partnerContactRoutes(fastify: FastifyInstance) {
   }>('/partner/:partnerId', {
     handler: async (request: FastifyRequest<{ Params: { partnerId: string } }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
         const contacts = await partnerContactService.findByPartnerId(request.params.partnerId, userId, companyId);
         
         return reply.send({
@@ -126,7 +129,8 @@ export async function partnerContactRoutes(fastify: FastifyInstance) {
   }>('/partner/:partnerId/primary', {
     handler: async (request: FastifyRequest<{ Params: { partnerId: string } }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
         const contact = await partnerContactService.findPrimaryByPartnerId(request.params.partnerId, userId, companyId);
         
         return reply.send({
@@ -160,7 +164,8 @@ export async function partnerContactRoutes(fastify: FastifyInstance) {
     preHandler: [createValidation({ body: updatePartnerContactSchema })],
     handler: async (request: FastifyRequest<{ Params: { id: string }; Body: UpdatePartnerContactDTO }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
         const contact = await partnerContactService.update(request.params.id, request.body, userId, companyId);
         
         return reply.send({
@@ -193,7 +198,8 @@ export async function partnerContactRoutes(fastify: FastifyInstance) {
   }>('/:id', {
     handler: async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
         await partnerContactService.delete(request.params.id, userId, companyId);
         
         return reply.code(204).send();
@@ -222,7 +228,8 @@ export async function partnerContactRoutes(fastify: FastifyInstance) {
   }>('/:id/set-primary', {
     handler: async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
         const contact = await partnerContactService.setPrimary(request.params.id, userId, companyId);
         
         return reply.send({
@@ -255,7 +262,8 @@ export async function partnerContactRoutes(fastify: FastifyInstance) {
   }>('/check-email', {
     handler: async (request: FastifyRequest<{ Querystring: { email: string; partnerId: string; excludeId?: string } }>, reply: FastifyReply) => {
       try {
-        const { userId, companyId } = request.user;
+        const userId = request.userId!;
+        const companyId = request.companyId!;
         const { email, partnerId, excludeId } = request.query;
         
         if (!email || !partnerId) {

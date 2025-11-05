@@ -2,11 +2,36 @@ import { FastifyInstance, FastifyRequest } from 'fastify';
 import jwt from 'jsonwebtoken';
 import { config } from '../../config';
 import { prisma } from '../../database/client';
-import { User } from '@artplim/types';
+import { Prisma } from '@prisma/client';
+
+// Definir o objeto de inclusão para o Prisma
+const userInclude = {
+  include: {
+    company: true,
+    employee: {
+      include: {
+        role: {
+          include: {
+            permissions: true,
+          },
+        },
+      },
+    },
+  },
+};
+
+// Inferir o tipo do usuário com base no objeto de inclusão
+type PrismaUserWithRelations = Prisma.UserGetPayload<typeof userInclude>;
+
+// Definir o tipo para Role com Permissions
+type RoleWithPermissions = Prisma.RoleGetPayload<typeof userInclude.include.employee.include.role>;
+
+// O tipo AuthenticatedUser é o tipo inferido pelo Prisma com as relações
+type AuthenticatedUser = PrismaUserWithRelations;
 
 declare module 'fastify' {
   interface FastifyRequest {
-    user?: User;
+    user?: AuthenticatedUser;
     userId?: string;
   }
 }
@@ -19,8 +44,8 @@ interface JwtPayload {
 }
 
 export async function authMiddleware(fastify: FastifyInstance) {
-  fastify.decorateRequest('user', null);
-  fastify.decorateRequest('userId', null);
+  fastify.decorateRequest('user', undefined);
+  fastify.decorateRequest('userId', undefined);
 
   fastify.addHook('preHandler', async (request: FastifyRequest) => {
     // Skip auth for public routes
@@ -49,17 +74,16 @@ export async function authMiddleware(fastify: FastifyInstance) {
       // Verify JWT token
       const decoded = jwt.verify(token, config.JWT_SECRET) as JwtPayload;
       
+      // Verificar se o token está expirado
+      const now = Math.floor(Date.now() / 1000);
+      if (decoded.exp && decoded.exp < now) {
+        throw fastify.httpErrors.unauthorized('Token expirado');
+      }
+      
       // Get user from database
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
-        include: {
-          company: true,
-          roles: {
-            include: {
-              permissions: true,
-            },
-          },
-        },
+        ...userInclude,
       });
 
       if (!user) {
@@ -71,7 +95,7 @@ export async function authMiddleware(fastify: FastifyInstance) {
       }
 
       // Attach user to request
-      request.user = user as User;
+      request.user = user as AuthenticatedUser; // Cast para AuthenticatedUser
       request.userId = user.id;
     } catch (error) {
       if (error instanceof jwt.JsonWebTokenError) {
@@ -86,15 +110,15 @@ export async function authMiddleware(fastify: FastifyInstance) {
 }
 
 // Helper function to check if user has permission
-export function hasPermission(user: User, permission: string): boolean {
-  return user.roles.some(role => 
-    role.permissions.some(p => p.name === permission)
-  );
+export function hasPermission(user: AuthenticatedUser, permission: string): boolean {
+  const perms = user.employee?.role?.permissions ?? [];
+  return perms.some(p => p.name === permission);
 }
 
 // Helper function to check if user has role
-export function hasRole(user: User, roleName: string): boolean {
-  return user.roles.some(role => role.name === roleName);
+export function hasRole(user: AuthenticatedUser, roleName: string): boolean {
+  const role = user.employee?.role;
+  return !!role && role.name === roleName;
 }
 
 // Decorator for route-level permission checking

@@ -1,4 +1,5 @@
-import { PrismaClient, Partner, PartnerContact, PartnerType, Prisma } from '@prisma/client';
+import { PrismaClient, Partner, Prisma, $Enums } from '@prisma/client';
+import type { PartnerType } from '@prisma/client';
 import { 
   CreatePartnerDTO, 
   UpdatePartnerDTO, 
@@ -17,15 +18,26 @@ export class PartnerRepository {
    */
   async create(data: CreatePartnerDTO, companyId: string): Promise<PartnerResponseDTO> {
     try {
+      // Garantir que documento esteja presente e seja string
+      const doc = data.document ?? '';
+      if (!doc.trim()) {
+        throw new AppError('Documento do parceiro é obrigatório', 400);
+      }
+      const createData: Prisma.PartnerCreateInput = {
+        name: data.name,
+        type: data.type,
+        document: doc, // document é obrigatório no schema
+        ...(data.email !== undefined ? { email: data.email } : {}),
+        ...(data.phone !== undefined ? { phone: data.phone } : {}),
+        ...(data.notes !== undefined ? { notes: data.notes } : {}),
+        company: { connect: { id: companyId } },
+        ...(data.address
+          ? { address: JSON.stringify(data.address) }
+          : {})
+      };
+
       const partner = await this.prisma.partner.create({
-        data: {
-          ...data,
-          companyId,
-          address: data.address ? JSON.stringify(data.address) : undefined
-        },
-        include: {
-          contacts: true
-        }
+        data: createData,
       });
 
       return this.formatPartnerResponse(partner);
@@ -48,14 +60,6 @@ export class PartnerRepository {
         where: {
           id,
           companyId,
-          deletedAt: null
-        },
-        include: {
-          contacts: {
-            orderBy: {
-              isPrimary: 'desc'
-            }
-          }
         }
       });
 
@@ -78,7 +82,6 @@ export class PartnerRepository {
     try {
       const where: Prisma.PartnerWhereInput = {
         companyId,
-        deletedAt: null,
         ...(filters.name && {
           name: {
             contains: filters.name,
@@ -98,13 +101,6 @@ export class PartnerRepository {
           }
         }),
         ...(filters.type && { type: filters.type }),
-        // status filter removido - não existe mais no schema
-        ...(filters.salesRepresentative && {
-          salesRepresentative: {
-            contains: filters.salesRepresentative,
-            mode: 'insensitive'
-          }
-        }),
         ...(filters.createdAfter && {
           createdAt: {
             gte: new Date(filters.createdAfter)
@@ -117,32 +113,17 @@ export class PartnerRepository {
         })
       };
 
-      // Filtros de endereço
+      // Filtros de endereço (campo address é string JSON no schema atual)
       if (filters.city || filters.state) {
-        const addressFilters: { path?: string[]; string_contains?: string } = {};
-        if (filters.city) {
-          addressFilters.path = ['city'];
-          addressFilters.string_contains = filters.city;
-        }
-        if (filters.state) {
-          addressFilters.path = ['state'];
-          addressFilters.string_contains = filters.state;
-        }
-        where.address = {
-          path: addressFilters.path,
-          string_contains: addressFilters.string_contains
-        };
+        where.AND = [
+          ...(filters.city ? [{ address: { contains: filters.city } }] : []),
+          ...(filters.state ? [{ address: { contains: filters.state } }] : [])
+        ];
       }
 
       const [partners, total] = await Promise.all([
         this.prisma.partner.findMany({
           where,
-          include: {
-            contacts: {
-              where: { isPrimary: true },
-              take: 1
-            }
-          },
           orderBy: {
             [filters.sortBy]: filters.sortOrder
           },
@@ -169,20 +150,22 @@ export class PartnerRepository {
    */
   async update(id: string, data: UpdatePartnerDTO, companyId: string): Promise<PartnerResponseDTO> {
     try {
+      const updateData: Prisma.PartnerUpdateInput = {
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.type !== undefined ? { type: data.type } : {}),
+        ...(data.document !== undefined ? { document: data.document } : {}),
+        ...(data.email !== undefined ? { email: data.email } : {}),
+        ...(data.phone !== undefined ? { phone: data.phone } : {}),
+        ...(data.notes !== undefined ? { notes: data.notes } : {}),
+        ...(data.address !== undefined
+          ? { address: data.address ? JSON.stringify(data.address) : null }
+          : {}),
+        updatedAt: new Date()
+      };
+
       const partner = await this.prisma.partner.update({
-        where: {
-          id,
-          companyId,
-          deletedAt: null
-        },
-        data: {
-          ...data,
-          address: data.address ? JSON.stringify(data.address) : undefined,
-          updatedAt: new Date()
-        },
-        include: {
-          contacts: true
-        }
+        where: { id },
+        data: updateData,
       });
 
       return this.formatPartnerResponse(partner);
@@ -200,20 +183,35 @@ export class PartnerRepository {
   }
 
   /**
+   * Atualiza status ativo/inativo do parceiro
+   */
+  async updateStatus(id: string, isActive: boolean, _companyId: string): Promise<PartnerResponseDTO> {
+    try {
+      const partner = await this.prisma.partner.update({
+        where: { id },
+        data: {
+          isActive,
+          updatedAt: new Date()
+        }
+      });
+
+      return this.formatPartnerResponse(partner);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new AppError('Parceiro não encontrado', 404);
+      }
+      throw new AppError('Erro ao atualizar status do parceiro', 500);
+    }
+  }
+
+  /**
    * Remove parceiro (soft delete)
    */
   async delete(id: string, companyId: string): Promise<void> {
     try {
       await this.prisma.partner.update({
-        where: {
-          id,
-          companyId,
-          deletedAt: null
-        },
-        data: {
-          deletedAt: new Date(),
-          isActive: false
-        }
+        where: { id },
+        data: { isActive: false }
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -231,18 +229,8 @@ export class PartnerRepository {
   async restore(id: string, companyId: string): Promise<PartnerResponseDTO> {
     try {
       const partner = await this.prisma.partner.update({
-        where: {
-          id,
-          companyId
-        },
-        data: {
-          deletedAt: null,
-          isActive: true,
-          updatedAt: new Date()
-        },
-        include: {
-          contacts: true
-        }
+        where: { id },
+        data: { isActive: true, updatedAt: new Date() }
       });
 
       return this.formatPartnerResponse(partner);
@@ -265,7 +253,6 @@ export class PartnerRepository {
         where: {
           document,
           companyId,
-          deletedAt: null,
           ...(excludeId && { id: { not: excludeId } })
         }
       });
@@ -285,14 +272,7 @@ export class PartnerRepository {
         where: {
           type,
           companyId,
-          deletedAt: null,
           isActive: true
-        },
-        include: {
-          contacts: {
-            where: { isPrimary: true },
-            take: 1
-          }
         },
         orderBy: {
           name: 'asc'
@@ -310,24 +290,27 @@ export class PartnerRepository {
    */
   async getStats(companyId: string): Promise<PartnerStatsDTO> {
     try {
-      const [stats, topCustomers, topSuppliers] = await Promise.all([
-        this.prisma.partner.groupBy({
-          by: ['isActive', 'type'],
-          where: {
-            companyId,
-            deletedAt: null
-          },
-          _count: true,
-          _sum: {
-            creditLimit: true
-          }
-        }),
+      const [
+        total,
+        active,
+        inactive,
+        customers,
+        suppliers,
+        both,
+        topCustomers,
+        topSuppliers
+      ] = await Promise.all([
+        this.prisma.partner.count({ where: { companyId } }),
+        this.prisma.partner.count({ where: { companyId, isActive: true } }),
+        this.prisma.partner.count({ where: { companyId, isActive: false } }),
+        this.prisma.partner.count({ where: { companyId, type: $Enums.PartnerType.CUSTOMER } }),
+        this.prisma.partner.count({ where: { companyId, type: $Enums.PartnerType.SUPPLIER } }),
+        this.prisma.partner.count({ where: { companyId, type: $Enums.PartnerType.BOTH } }),
         // Top customers (simulado - seria baseado em pedidos)
         this.prisma.partner.findMany({
           where: {
-            type: { in: [PartnerType.CUSTOMER, PartnerType.BOTH] },
+            type: { in: [$Enums.PartnerType.CUSTOMER, $Enums.PartnerType.BOTH] },
             companyId,
-            deletedAt: null,
             isActive: true
           },
           select: {
@@ -342,9 +325,8 @@ export class PartnerRepository {
         // Top suppliers (simulado - seria baseado em compras)
         this.prisma.partner.findMany({
           where: {
-            type: { in: [PartnerType.SUPPLIER, PartnerType.BOTH] },
+            type: { in: [$Enums.PartnerType.SUPPLIER, $Enums.PartnerType.BOTH] },
             companyId,
-            deletedAt: null,
             isActive: true
           },
           select: {
@@ -359,13 +341,13 @@ export class PartnerRepository {
       ]);
 
       const result: PartnerStatsDTO = {
-        total: 0,
-        active: 0,
-        inactive: 0,
+        total,
+        active,
+        inactive,
         blocked: 0,
-        customers: 0,
-        suppliers: 0,
-        both: 0,
+        customers,
+        suppliers,
+        both,
         totalCreditLimit: 0,
         averageCreditLimit: 0,
         topCustomers: topCustomers.map(c => ({
@@ -382,19 +364,7 @@ export class PartnerRepository {
         }))
       };
 
-      stats.forEach(stat => {
-        result.total += stat._count;
-        result.totalCreditLimit += stat._sum.creditLimit || 0;
-
-        if (stat.isActive === true) result.active += stat._count;
-        if (stat.isActive === false) result.inactive += stat._count;
-        // blocked status não existe mais, mantendo para compatibilidade
-
-        if (stat.type === PartnerType.CUSTOMER) result.customers += stat._count;
-        if (stat.type === PartnerType.SUPPLIER) result.suppliers += stat._count;
-        if (stat.type === PartnerType.BOTH) result.both += stat._count;
-      });
-
+      // Campo creditLimit removido do schema; manter acumulado como 0
       result.averageCreditLimit = result.total > 0 ? result.totalCreditLimit / result.total : 0;
 
       return result;
@@ -410,9 +380,7 @@ export class PartnerRepository {
     try {
       const where: Prisma.PartnerWhereInput = {
         companyId,
-        deletedAt: null,
         ...(filters.type && { type: filters.type }),
-        ...(filters.status && { status: filters.status }),
         ...(filters.createdAfter && {
           createdAt: {
             gte: new Date(filters.createdAfter)
@@ -436,7 +404,6 @@ export class PartnerRepository {
           type: true,
           isActive: true,
           address: true,
-          creditLimit: true,
           createdAt: true
         },
         orderBy: {
@@ -446,22 +413,24 @@ export class PartnerRepository {
 
       return partners.map(partner => {
         const address = partner.address ? JSON.parse(partner.address as string) : null;
-        return {
+        const report: PartnerReportDTO = {
           id: partner.id,
           name: partner.name,
-          email: partner.email,
-          phone: partner.phone,
-          document: partner.document,
-          type: partner.type,
+          email: partner.email ?? '',
+          phone: partner.phone ?? '',
+          document: partner.document ?? '',
+          type: String(partner.type),
           isActive: partner.isActive,
-          city: address?.city,
-          state: address?.state,
-          creditLimit: partner.creditLimit,
+          city: address?.city ?? '',
+          state: address?.state ?? '',
+          // Campo creditLimit removido do schema
+          creditLimit: 0,
           totalOrders: 0,    // Seria calculado com base nos pedidos
           totalValue: 0,     // Seria calculado com base nos pedidos
-          lastOrderDate: undefined, // Seria calculado com base nos pedidos
           createdAt: partner.createdAt
         };
+        // Não incluir lastOrderDate quando não definido para compatibilidade com exactOptionalPropertyTypes
+        return report;
       });
     } catch {
       throw new AppError('Erro ao gerar relatório', 500);
@@ -471,41 +440,30 @@ export class PartnerRepository {
   /**
    * Formata resposta do parceiro
    */
-  private formatPartnerResponse(partner: Partner & { contacts?: PartnerContact[] }): PartnerResponseDTO {
+  private formatPartnerResponse(partner: Partner): PartnerResponseDTO {
     const address = partner.address ? JSON.parse(partner.address as string) : undefined;
     
     return {
       id: partner.id,
       name: partner.name,
-      email: partner.email || '',
-      phone: partner.phone || '',
-      document: partner.document,
+      email: partner.email ?? '',
+      phone: partner.phone ?? '',
+      document: partner.document ?? '',
       type: partner.type,
       isActive: partner.isActive,
       notes: partner.notes || '',
       address,
       creditLimit: 0,
       paymentTerms: '', // Empty string instead of null since paymentTerms expects string type
-      salesRepresentative: partner.salesRepresentative,
-      discount: partner.discount,
-      metadata: partner.metadata as Record<string, unknown>,
-      contacts: partner.contacts?.map(contact => ({
-        id: contact.id,
-        partnerId: contact.partnerId,
-        name: contact.name,
-        email: contact.email,
-        phone: contact.phone,
-        position: contact.position,
-        department: contact.department,
-        isPrimary: contact.isPrimary,
-        notes: contact.notes,
-        createdAt: contact.createdAt,
-        updatedAt: contact.updatedAt
-      })),
+      // Campos não presentes no schema atual; valores padrão
+      salesRepresentative: '',
+      discount: 0,
+      metadata: {},
+      contacts: [],
       companyId: partner.companyId,
       createdAt: partner.createdAt,
       updatedAt: partner.updatedAt,
-      deletedAt: partner.deletedAt
+      // Campo deletedAt não presente no schema atual
     };
   }
 }

@@ -7,16 +7,17 @@ export const createProductDto = z.object({
   name: z.string().min(1, 'Nome é obrigatório').max(255, 'Nome deve ter no máximo 255 caracteres'),
   description: z.string().optional(),
   sku: z.string().min(1, 'SKU é obrigatório').max(100, 'SKU deve ter no máximo 100 caracteres'),
-  barcode: z.string().optional(),
   categoryId: z.string().uuid('ID da categoria deve ser um UUID válido'),
-  unitOfMeasure: z.enum(['UN', 'KG', 'L', 'M', 'M2', 'M3', 'PC', 'CX', 'PCT'], {
-    errorMap: () => ({ message: 'Unidade de medida inválida' })
-  }),
+  unit: z.string().min(1, 'Unidade de medida é obrigatória').max(10, 'Unidade de medida deve ter no máximo 10 caracteres'),
   costPrice: z.number().min(0, 'Preço de custo deve ser maior ou igual a zero'),
   salePrice: z.number().min(0, 'Preço de venda deve ser maior ou igual a zero'),
+  wholesalePrice: z.number().min(0, 'Preço de atacado deve ser maior ou igual a zero').optional(),
+  profitMargin: z.number().optional(),
+  trackStock: z.boolean().default(true),
   minStock: z.number().int().min(0, 'Estoque mínimo deve ser um número inteiro maior ou igual a zero').default(0),
   maxStock: z.number().int().min(0, 'Estoque máximo deve ser um número inteiro maior ou igual a zero').optional(),
   currentStock: z.number().int().min(0, 'Estoque atual deve ser um número inteiro maior ou igual a zero').default(0),
+  initialStock: z.number().int().min(0, 'Estoque inicial deve ser um número inteiro maior ou igual a zero').optional(),
   location: z.string().optional(),
   weight: z.number().min(0, 'Peso deve ser maior ou igual a zero').optional(),
   dimensions: z.object({
@@ -24,7 +25,6 @@ export const createProductDto = z.object({
     width: z.number().min(0, 'Largura deve ser maior ou igual a zero').optional(),
     height: z.number().min(0, 'Altura deve ser maior ou igual a zero').optional()
   }).optional(),
-  images: z.array(z.string().url('URL da imagem inválida')).optional(),
   isActive: z.boolean().default(true),
   isService: z.boolean().default(false),
   hasVariations: z.boolean().default(false),
@@ -34,9 +34,8 @@ export const createProductDto = z.object({
     costPrice: z.number().min(0, 'Preço de custo da variação deve ser maior ou igual a zero'),
     salePrice: z.number().min(0, 'Preço de venda da variação deve ser maior ou igual a zero'),
     stock: z.number().int().min(0, 'Estoque da variação deve ser um número inteiro maior ou igual a zero').default(0),
-    attributes: z.record(z.string()).optional()
+    attributes: z.record(z.string(), z.any()).optional()
   })).optional(),
-  tags: z.array(z.string()).optional(),
   notes: z.string().optional()
 });
 
@@ -74,15 +73,19 @@ export const productResponseDto = z.object({
   description: z.string().nullable(),
   sku: z.string(),
   barcode: z.string().nullable(),
-  categoryId: z.string().uuid(),
+  categoryId: z.string().uuid().nullable(),
   category: z.object({
     id: z.string().uuid(),
     name: z.string(),
     description: z.string().nullable()
   }).optional(),
   unitOfMeasure: z.string(),
+  unit: z.string(),
   costPrice: z.number(),
   salePrice: z.number(),
+  wholesalePrice: z.number().nullable(),
+  profitMargin: z.number().nullable(),
+  trackStock: z.boolean(),
   minStock: z.number(),
   maxStock: z.number().nullable(),
   currentStock: z.number(),
@@ -93,6 +96,9 @@ export const productResponseDto = z.object({
     width: z.number().nullable(),
     height: z.number().nullable()
   }).nullable(),
+  length: z.number().nullable(),
+  width: z.number().nullable(),
+  height: z.number().nullable(),
   images: z.array(z.string()),
   isActive: z.boolean(),
   isService: z.boolean(),
@@ -104,7 +110,7 @@ export const productResponseDto = z.object({
     costPrice: z.number(),
     salePrice: z.number(),
     stock: z.number(),
-    attributes: z.record(z.string())
+    attributes: z.record(z.string(), z.any())
   })).optional(),
   tags: z.array(z.string()),
   notes: z.string().nullable(),
@@ -195,11 +201,10 @@ export const productCategoryResponseDto = z.object({
 export const createStockMovementDto = z.object({
   productId: z.string().uuid('ID do produto deve ser um UUID válido'),
   variationId: z.string().uuid('ID da variação deve ser um UUID válido').optional(),
-  type: z.enum(['IN', 'OUT', 'ADJUSTMENT', 'TRANSFER'], {
-    errorMap: () => ({ message: 'Tipo de movimentação inválido' })
-  }),
+  type: z.enum(['IN', 'OUT', 'ADJUSTMENT', 'TRANSFER']),
   quantity: z.number().int().min(1, 'Quantidade deve ser um número inteiro maior que zero'),
   unitCost: z.number().min(0, 'Custo unitário deve ser maior ou igual a zero').optional(),
+  totalCost: z.number().min(0, 'Custo total deve ser maior ou igual a zero').optional(),
   reason: z.string().min(1, 'Motivo é obrigatório').max(500, 'Motivo deve ter no máximo 500 caracteres'),
   reference: z.string().optional(),
   notes: z.string().optional()

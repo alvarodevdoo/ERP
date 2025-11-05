@@ -14,6 +14,7 @@ export class PartnerContactService {
 
   constructor(private prisma: PrismaClient) {
     this.partnerContactRepository = new PartnerContactRepository(prisma);
+    // 
     this.authService = new AuthService(prisma);
   }
 
@@ -186,7 +187,8 @@ export class PartnerContactService {
   /**
    * Cria contato primário automaticamente
    */
-  async createPrimaryContact(partnerId: string, partnerName: string, partnerEmail?: string, partnerPhone?: string, companyId: string): Promise<PartnerContactResponseDTO | null> {
+  // 
+  async createPrimaryContact(partnerId: string, partnerName: string, companyId: string, partnerEmail?: string, partnerPhone?: string): Promise<PartnerContactResponseDTO | null> {
     // Se não tem dados suficientes, não cria contato
     if (!partnerEmail && !partnerPhone) {
       return null;
@@ -232,8 +234,8 @@ export class PartnerContactService {
   /**
    * Normaliza dados do contato
    */
-  private normalizeContactData(data: CreatePartnerContactDTO | UpdatePartnerContactDTO): CreatePartnerContactDTO | UpdatePartnerContactDTO {
-    const normalized = { ...data };
+  private normalizeContactData<T extends CreatePartnerContactDTO | UpdatePartnerContactDTO>(data: T): T {
+    const normalized = { ...data } as T;
 
     // Normaliza nome
     if (normalized.name) {
@@ -260,7 +262,7 @@ export class PartnerContactService {
       normalized.department = normalized.department.trim();
     }
 
-    return normalized;
+    return normalized as T;
   }
 
   /**

@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import {
   CreateTransactionDTO,
   UpdateTransactionDTO,
@@ -23,6 +23,7 @@ import {
 } from '../dtos';
 import { FinancialRepository } from '../repositories';
 import { RoleService } from '../../role/services';
+import { RoleRepository } from '../../role/repositories/role.repository';
 import { AppError } from '../../../shared/errors/AppError';
 
 export class FinancialService {
@@ -31,7 +32,7 @@ export class FinancialService {
 
   constructor(private prisma: PrismaClient) {
     this.financialRepository = new FinancialRepository(prisma);
-    this.roleService = new RoleService(prisma);
+    this.roleService = new RoleService(new RoleRepository(prisma));
   }
 
   // Métodos para transações financeiras
@@ -40,47 +41,17 @@ export class FinancialService {
     userId: string,
     companyId: string
   ): Promise<TransactionResponseDTO> {
-    // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'create'
-    );
+      resource: 'financial',
+      permission: 'create'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para criar transações financeiras', 403);
     }
 
-    // Validar se a categoria existe e pertence à empresa
-    const category = await this.prisma.financialCategory.findFirst({
-      where: {
-        id: data.categoryId,
-        companyId
-      }
-    });
-
-    if (!category) {
-      throw new AppError('Categoria não encontrada', 404);
-    }
-
-    // Validar se a conta existe e pertence à empresa
-    const account = await this.prisma.financialAccount.findFirst({
-      where: {
-        id: data.accountId,
-        companyId,
-        isActive: true
-      }
-    });
-
-    if (!account) {
-      throw new AppError('Conta não encontrada ou inativa', 404);
-    }
-
-    // Validar se o tipo da categoria corresponde ao tipo da transação
-    if (category.type !== data.type) {
-      throw new AppError('Tipo da categoria não corresponde ao tipo da transação', 400);
-    }
+    // Removido: validações de categoria e conta (modelos não existem no schema atual)
 
     try {
       // Criar transação usando transação do banco
@@ -112,12 +83,11 @@ export class FinancialService {
     companyId: string
   ): Promise<TransactionResponseDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'read'
-    );
+      resource: 'financial',
+      permission: 'read'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para visualizar transações financeiras', 403);
@@ -142,18 +112,17 @@ export class FinancialService {
     totalPages: number;
   }> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'read'
-    );
+      resource: 'financial',
+      permission: 'read'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para visualizar transações financeiras', 403);
     }
 
-    return this.financialRepository.findTransactions({ ...filters, companyId });
+    return this.financialRepository.findTransactions(filters, companyId);
   }
 
   async updateTransaction(
@@ -163,12 +132,11 @@ export class FinancialService {
     companyId: string
   ): Promise<TransactionResponseDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'update'
-    );
+      resource: 'financial',
+      permission: 'update'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para atualizar transações financeiras', 403);
@@ -180,33 +148,7 @@ export class FinancialService {
       throw new AppError('Transação não encontrada', 404);
     }
 
-    // Validações adicionais se necessário
-    if (data.categoryId) {
-      const category = await this.prisma.financialCategory.findFirst({
-        where: {
-          id: data.categoryId,
-          companyId
-        }
-      });
-
-      if (!category) {
-        throw new AppError('Categoria não encontrada', 404);
-      }
-    }
-
-    if (data.accountId) {
-      const account = await this.prisma.financialAccount.findFirst({
-        where: {
-          id: data.accountId,
-          companyId,
-          isActive: true
-        }
-      });
-
-      if (!account) {
-        throw new AppError('Conta não encontrada ou inativa', 404);
-      }
-    }
+    // Removido: validações de categoria/conta baseadas em modelos não suportados
 
     return this.financialRepository.updateTransaction(id, data, companyId);
   }
@@ -218,12 +160,11 @@ export class FinancialService {
     companyId: string
   ): Promise<TransactionResponseDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'update'
-    );
+      resource: 'financial',
+      permission: 'update'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para pagar transações financeiras', 403);
@@ -247,19 +188,12 @@ export class FinancialService {
           {
             status: 'PAID',
             paymentDate: data.paymentDate,
-            paidAmount: data.paidAmount,
-            paymentMethod: data.paymentMethod,
             notes: data.notes
           },
           companyId
         );
 
-        // Atualizar saldo da conta
-        await this.updateAccountBalance(
-          tx,
-          transaction.accountId,
-          transaction.type === 'INCOME' ? data.paidAmount : -data.paidAmount
-        );
+        // Removido: atualização de saldo de conta (modelo de conta não existe no schema)
 
         return updatedTransaction;
       });
@@ -274,12 +208,11 @@ export class FinancialService {
     companyId: string
   ): Promise<void> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'delete'
-    );
+      resource: 'financial',
+      permission: 'delete'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para excluir transações financeiras', 403);
@@ -291,20 +224,8 @@ export class FinancialService {
       throw new AppError('Transação não encontrada', 404);
     }
 
-    // Se a transação foi paga, reverter o saldo da conta
-    if (transaction.status === 'PAID' && transaction.paidAmount) {
-      await this.prisma.$transaction(async (tx) => {
-        await this.updateAccountBalance(
-          tx,
-          transaction.accountId,
-          transaction.type === 'INCOME' ? -transaction.paidAmount! : transaction.paidAmount!
-        );
-
-        await this.financialRepository.deleteTransaction(id, companyId);
-      });
-    } else {
-      await this.financialRepository.deleteTransaction(id, companyId);
-    }
+    // Removido: reversão de saldo de conta (modelos de conta não existem no schema)
+    await this.financialRepository.deleteTransaction(id, companyId);
   }
 
   // Métodos para categorias
@@ -314,44 +235,17 @@ export class FinancialService {
     companyId: string
   ): Promise<CategoryResponseDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'create'
-    );
+      resource: 'financial',
+      permission: 'create'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para criar categorias financeiras', 403);
     }
 
-    // Verificar se já existe uma categoria com o mesmo nome
-    const existingCategory = await this.prisma.financialCategory.findFirst({
-      where: {
-        name: data.name,
-        type: data.type,
-        companyId
-      }
-    });
-
-    if (existingCategory) {
-      throw new AppError('Já existe uma categoria com este nome para este tipo', 400);
-    }
-
-    // Validar categoria pai se fornecida
-    if (data.parentId) {
-      const parentCategory = await this.prisma.financialCategory.findFirst({
-        where: {
-          id: data.parentId,
-          type: data.type,
-          companyId
-        }
-      });
-
-      if (!parentCategory) {
-        throw new AppError('Categoria pai não encontrada ou tipo incompatível', 404);
-      }
-    }
+    // Removido: validações baseadas em modelos de categoria não suportados
 
     return this.financialRepository.createCategory({ ...data, companyId });
   }
@@ -362,12 +256,11 @@ export class FinancialService {
     companyId: string
   ): Promise<CategoryResponseDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'read'
-    );
+      resource: 'financial',
+      permission: 'read'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para visualizar categorias financeiras', 403);
@@ -392,12 +285,11 @@ export class FinancialService {
     totalPages: number;
   }> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'read'
-    );
+      resource: 'financial',
+      permission: 'read'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para visualizar categorias financeiras', 403);
@@ -413,12 +305,11 @@ export class FinancialService {
     companyId: string
   ): Promise<CategoryResponseDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'update'
-    );
+      resource: 'financial',
+      permission: 'update'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para atualizar categorias financeiras', 403);
@@ -430,21 +321,7 @@ export class FinancialService {
       throw new AppError('Categoria não encontrada', 404);
     }
 
-    // Verificar duplicação de nome se fornecido
-    if (data.name) {
-      const duplicateCategory = await this.prisma.financialCategory.findFirst({
-        where: {
-          name: data.name,
-          type: data.type || existingCategory.type,
-          companyId,
-          id: { not: id }
-        }
-      });
-
-      if (duplicateCategory) {
-        throw new AppError('Já existe uma categoria com este nome para este tipo', 400);
-      }
-    }
+    // Removido: verificação de duplicação de nome (categorias não suportadas no schema atual)
 
     return this.financialRepository.updateCategory(id, data, companyId);
   }
@@ -455,12 +332,11 @@ export class FinancialService {
     companyId: string
   ): Promise<void> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'delete'
-    );
+      resource: 'financial',
+      permission: 'delete'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para excluir categorias financeiras', 403);
@@ -472,29 +348,7 @@ export class FinancialService {
       throw new AppError('Categoria não encontrada', 404);
     }
 
-    // Verificar se há transações vinculadas
-    const transactionsCount = await this.prisma.financialTransaction.count({
-      where: {
-        categoryId: id,
-        companyId
-      }
-    });
-
-    if (transactionsCount > 0) {
-      throw new AppError('Não é possível excluir categoria com transações vinculadas', 400);
-    }
-
-    // Verificar se há subcategorias
-    const subcategoriesCount = await this.prisma.financialCategory.count({
-      where: {
-        parentId: id,
-        companyId
-      }
-    });
-
-    if (subcategoriesCount > 0) {
-      throw new AppError('Não é possível excluir categoria com subcategorias', 400);
-    }
+    // Removido: verificações baseadas em modelos não suportados no schema
 
     await this.financialRepository.deleteCategory(id, companyId);
   }
@@ -506,28 +360,17 @@ export class FinancialService {
     companyId: string
   ): Promise<AccountResponseDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'create'
-    );
+      resource: 'financial',
+      permission: 'create'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para criar contas financeiras', 403);
     }
 
-    // Verificar se já existe uma conta com o mesmo nome
-    const existingAccount = await this.prisma.financialAccount.findFirst({
-      where: {
-        name: data.name,
-        companyId
-      }
-    });
-
-    if (existingAccount) {
-      throw new AppError('Já existe uma conta com este nome', 400);
-    }
+    // Removido: validação baseada em modelo de conta não suportado
 
     return this.financialRepository.createAccount({ ...data, companyId });
   }
@@ -538,12 +381,11 @@ export class FinancialService {
     companyId: string
   ): Promise<AccountResponseDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'read'
-    );
+      resource: 'financial',
+      permission: 'read'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para visualizar contas financeiras', 403);
@@ -568,12 +410,11 @@ export class FinancialService {
     totalPages: number;
   }> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'read'
-    );
+      resource: 'financial',
+      permission: 'read'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para visualizar contas financeiras', 403);
@@ -589,12 +430,11 @@ export class FinancialService {
     companyId: string
   ): Promise<AccountResponseDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'update'
-    );
+      resource: 'financial',
+      permission: 'update'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para atualizar contas financeiras', 403);
@@ -606,20 +446,7 @@ export class FinancialService {
       throw new AppError('Conta não encontrada', 404);
     }
 
-    // Verificar duplicação de nome se fornecido
-    if (data.name) {
-      const duplicateAccount = await this.prisma.financialAccount.findFirst({
-        where: {
-          name: data.name,
-          companyId,
-          id: { not: id }
-        }
-      });
-
-      if (duplicateAccount) {
-        throw new AppError('Já existe uma conta com este nome', 400);
-      }
-    }
+    // Removido: validação baseada em modelo de conta não suportado
 
     return this.financialRepository.updateAccount(id, data, companyId);
   }
@@ -630,12 +457,11 @@ export class FinancialService {
     companyId: string
   ): Promise<void> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'delete'
-    );
+      resource: 'financial',
+      permission: 'delete'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para excluir contas financeiras', 403);
@@ -647,32 +473,7 @@ export class FinancialService {
       throw new AppError('Conta não encontrada', 404);
     }
 
-    // Verificar se há transações vinculadas
-    const transactionsCount = await this.prisma.financialTransaction.count({
-      where: {
-        accountId: id,
-        companyId
-      }
-    });
-
-    if (transactionsCount > 0) {
-      throw new AppError('Não é possível excluir conta com transações vinculadas', 400);
-    }
-
-    // Verificar se há transferências vinculadas
-    const transfersCount = await this.prisma.financialTransfer.count({
-      where: {
-        OR: [
-          { fromAccountId: id },
-          { toAccountId: id }
-        ],
-        companyId
-      }
-    });
-
-    if (transfersCount > 0) {
-      throw new AppError('Não é possível excluir conta com transferências vinculadas', 400);
-    }
+    // Removido: validações baseadas em modelos não suportados no schema
 
     await this.financialRepository.deleteAccount(id, companyId);
   }
@@ -684,12 +485,11 @@ export class FinancialService {
     companyId: string
   ): Promise<TransferResponseDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'create'
-    );
+      resource: 'financial',
+      permission: 'create'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para criar transferências', 403);
@@ -700,29 +500,7 @@ export class FinancialService {
       throw new AppError('Conta de origem e destino devem ser diferentes', 400);
     }
 
-    // Validar se as contas existem e estão ativas
-    const [fromAccount, toAccount] = await Promise.all([
-      this.prisma.financialAccount.findFirst({
-        where: { id: data.fromAccountId, companyId, isActive: true }
-      }),
-      this.prisma.financialAccount.findFirst({
-        where: { id: data.toAccountId, companyId, isActive: true }
-      })
-    ]);
-
-    if (!fromAccount) {
-      throw new AppError('Conta de origem não encontrada ou inativa', 404);
-    }
-
-    if (!toAccount) {
-      throw new AppError('Conta de destino não encontrada ou inativa', 404);
-    }
-
-    // Verificar se há saldo suficiente na conta de origem
-    const availableBalance = fromAccount.balance + (fromAccount.creditLimit || 0);
-    if (availableBalance < (data.amount + data.fee)) {
-      throw new AppError('Saldo insuficiente na conta de origem', 400);
-    }
+    // Removido: validações baseadas em modelos de conta não suportados no schema atual
 
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -733,9 +511,7 @@ export class FinancialService {
           userId
         });
 
-        // Atualizar saldos das contas
-        await this.updateAccountBalance(tx, data.fromAccountId, -(data.amount + data.fee));
-        await this.updateAccountBalance(tx, data.toAccountId, data.amount);
+        // Removido: atualização de saldos de contas (modelos de conta não existem no schema)
 
         return transfer;
       });
@@ -754,12 +530,11 @@ export class FinancialService {
     totalPages: number;
   }> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'read'
-    );
+      resource: 'financial',
+      permission: 'read'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para visualizar transferências', 403);
@@ -776,12 +551,11 @@ export class FinancialService {
     endDate?: string
   ): Promise<FinancialStatsDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'read'
-    );
+      resource: 'financial',
+      permission: 'read'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para visualizar estatísticas financeiras', 403);
@@ -797,12 +571,11 @@ export class FinancialService {
     endDate: string
   ): Promise<CashFlowDTO[]> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'read'
-    );
+      resource: 'financial',
+      permission: 'read'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para visualizar fluxo de caixa', 403);
@@ -818,12 +591,11 @@ export class FinancialService {
     format: 'json' | 'csv' = 'json'
   ): Promise<FinancialReportDTO[] | string> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'read'
-    );
+      resource: 'financial',
+      permission: 'read'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para gerar relatórios financeiros', 403);
@@ -843,37 +615,36 @@ export class FinancialService {
     companyId: string
   ): Promise<FinancialDashboardDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
-      companyId,
-      'financial',
-      'read'
-    );
+      resource: 'financial',
+      permission: 'read'
+    });
 
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para visualizar dashboard financeiro', 403);
     }
 
     try {
-      const [stats, recentTransactions, overdueTransactions, upcomingTransactions, accounts] = await Promise.all([
+      const [stats, recentTransactions, overdueTransactions, upcomingTransactions] = await Promise.all([
         this.financialRepository.getStats(companyId),
+        // 
         this.financialRepository.findTransactions({
-          companyId,
           page: 1,
           limit: 10,
           sortBy: 'createdAt',
           sortOrder: 'desc'
-        }),
+        }, companyId),
+        // 
         this.financialRepository.findTransactions({
-          companyId,
           status: 'OVERDUE',
           page: 1,
           limit: 10,
           sortBy: 'dueDate',
           sortOrder: 'asc'
-        }),
+        }, companyId),
+        // 
         this.financialRepository.findTransactions({
-          companyId,
           status: 'PENDING',
           startDate: new Date().toISOString(),
           endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // Próximos 30 dias
@@ -881,15 +652,7 @@ export class FinancialService {
           limit: 10,
           sortBy: 'dueDate',
           sortOrder: 'asc'
-        }),
-        this.financialRepository.findAccounts({
-          companyId,
-          isActive: true,
-          page: 1,
-          limit: 100,
-          sortBy: 'name',
-          sortOrder: 'asc'
-        })
+        }, companyId)
       ]);
 
       // Calcular fluxo de caixa dos últimos 12 meses
@@ -910,12 +673,7 @@ export class FinancialService {
         recentTransactions: recentTransactions.transactions,
         overdueTransactions: overdueTransactions.transactions,
         upcomingTransactions: upcomingTransactions.transactions,
-        accountsBalance: accounts.accounts.map(account => ({
-          accountId: account.id,
-          accountName: account.name,
-          balance: account.balance,
-          type: account.type
-        })),
+        accountsBalance: [],
         monthlyComparison
       };
     } catch (error) {
@@ -925,7 +683,7 @@ export class FinancialService {
 
   // Métodos auxiliares
   private async createInstallments(
-    tx: Record<string, unknown>,
+    tx: Prisma.TransactionClient,
     transactionId: string,
     data: CreateTransactionDTO,
     companyId: string,
@@ -938,42 +696,24 @@ export class FinancialService {
       const installmentDueDate = new Date(dueDate);
       installmentDueDate.setMonth(installmentDueDate.getMonth() + (i - 1));
 
-      await tx.financialTransaction.create({
+      await tx.financialEntry.create({
         data: {
           type: data.type,
-          categoryId: data.categoryId,
-          accountId: data.accountId,
-          amount: installmentAmount,
-          description: `${data.description} - Parcela ${i}/${data.installments}`,
-          dueDate: installmentDueDate,
           status: 'PENDING',
-          installments: data.installments,
-          currentInstallment: i,
-          tags: data.tags,
-          notes: data.notes,
-          referenceId: data.referenceId,
-          referenceType: data.referenceType,
-          companyId,
-          createdBy: userId
+          category: (data as any).categoryId || 'Geral',
+          description: `${data.description} - Parcela ${i}/${data.installments}`,
+          amount: installmentAmount,
+          dueDate: installmentDueDate,
+          userId,
+          reference: (data as any).referenceId || null,
+          notes: data.notes || null,
+          companyId
         }
       });
     }
   }
 
-  private async updateAccountBalance(
-    tx: Record<string, unknown>,
-    accountId: string,
-    amount: number
-  ): Promise<void> {
-    await tx.financialAccount.update({
-      where: { id: accountId },
-      data: {
-        balance: {
-          increment: amount
-        }
-      }
-    });
-  }
+  // Removido: updateAccountBalance (modelo de conta não existe no schema)
 
   private async calculateMonthlyComparison(companyId: string): Promise<Array<{
     month: string;
@@ -993,11 +733,11 @@ export class FinancialService {
       const nextMonth = new Date(date);
       nextMonth.setMonth(nextMonth.getMonth() + 1);
 
-      const transactions = await this.prisma.financialTransaction.findMany({
+      const transactions = await this.prisma.financialEntry.findMany({
         where: {
           companyId,
           status: 'PAID',
-          paymentDate: {
+          paidDate: {
             gte: date,
             lt: nextMonth
           }
@@ -1006,11 +746,11 @@ export class FinancialService {
 
       const income = transactions
         .filter(t => t.type === 'INCOME')
-        .reduce((sum, t) => sum + (t.paidAmount || t.amount), 0);
+        .reduce((sum, t) => sum + Number((t as any).amount?.toNumber ? (t as any).amount.toNumber() : t.amount), 0);
 
       const expense = transactions
         .filter(t => t.type === 'EXPENSE')
-        .reduce((sum, t) => sum + (t.paidAmount || t.amount), 0);
+        .reduce((sum, t) => sum + Number((t as any).amount?.toNumber ? (t as any).amount.toNumber() : t.amount), 0);
 
       months.push({
         month: date.toLocaleDateString('pt-BR', { year: 'numeric', month: 'short' }),

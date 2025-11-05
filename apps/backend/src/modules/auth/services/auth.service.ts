@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
-import jwt, { SignOptions } from 'jsonwebtoken';
+import jwt, { JwtPayload, Secret, SignOptions } from 'jsonwebtoken';
+type JWTStringValue = `${number}${string}`;
 import { Prisma, PrismaClient } from '@prisma/client';
 import { AuthRepository } from '../repositories/auth.repository';
 import { config } from '../../../config';
@@ -16,6 +17,8 @@ import {
   ChangePasswordDto,
   UpdateProfileDto,
 } from '../dtos';
+import { UserRepository } from '../../user/repositories/user.repository';
+import { CompanyRepository } from '../../company/repositories/company.repository';
 
 /**
  * Serviço de autenticação
@@ -24,10 +27,16 @@ import {
 export class AuthService {
   private authRepository: AuthRepository;
   private prisma: PrismaClient;
+  // Repositório de roles para verificação de permissões
+  private roleRepository: import('../../role/repositories/role.repository').RoleRepository;
 
-  constructor(prisma: PrismaClient) {
+  constructor(prisma: PrismaClient, authRepository?: AuthRepository) {
     this.prisma = prisma;
-    this.authRepository = new AuthRepository();
+    this.authRepository = authRepository || new AuthRepository();
+    //  - Usando import dinâmico em vez de require
+    import('../../role/repositories/role.repository').then(module => {
+      this.roleRepository = new module.RoleRepository(this.prisma);
+    });
   }
   async login(data: LoginDto): Promise<LoginResponseDto> {
     const { email, password } = data;
@@ -51,6 +60,9 @@ export class AuthService {
       }
 
       // Generate tokens
+      if (!user.companyId) {
+        throw new Error('Usuário deve estar associado a uma empresa');
+      }
       const tokens = await this.generateTokens(user.id, user.companyId);
 
       // TODO: Implementar atualização de último login
@@ -79,7 +91,7 @@ export class AuthService {
         tokens,
       };
     } catch (error) {
-      logger.error(error, 'AuthService.login');
+      logger.error({ err: error }, 'AuthService.login');
       throw error;
     }
   }
@@ -136,7 +148,7 @@ export class AuthService {
         tokens,
       };
     } catch (error) {
-      logger.error(error, 'AuthService.register');
+      logger.error({ err: error }, 'AuthService.register');
       throw error;
     }
   }
@@ -156,6 +168,9 @@ export class AuthService {
       }
 
       // Generate new tokens
+      if (!user.companyId) {
+        throw new Error('Usuário deve estar associado a uma empresa');
+      }
       const tokens = await this.generateTokens(user.id, user.companyId);
 
       return tokens;
@@ -180,7 +195,7 @@ export class AuthService {
       // Por enquanto, apenas log da solicitação
       logger.info(`Password reset requested for ${email}`);
     } catch (error) {
-      logger.error(error, 'AuthService.forgotPassword');
+      logger.error({ err: error }, 'AuthService.forgotPassword');
       throw error;
     }
   }
@@ -227,7 +242,7 @@ export class AuthService {
       logger.info(`Perfil atualizado para usuário ${user.email}`);
       return user;
     } catch (error) {
-      logger.error(error, 'AuthService.updateProfile');
+      logger.error({ err: error }, 'AuthService.updateProfile');
       throw new Error('Falha ao atualizar perfil');
     }
   }
@@ -237,44 +252,32 @@ export class AuthService {
    */
   async hasPermission(userId: string, permission: string): Promise<boolean> {
     try {
-      const user = await this.authRepository.findUserById(userId);
-      
-      if (!user || !user.isActive) {
-        return false;
+      // Delegar verificação ao RoleRepository usando o formato 'resource:action'
+      const [resource, action] = permission.split(':');
+      if (resource && action) {
+        return await this.roleRepository.userHasPermission(userId, action, resource);
+      } else {
+        // Se não houver separação por ':', usar como permissão simples
+        return await this.roleRepository.userHasPermission(userId, permission);
       }
-
-      // Se o usuário não tem employee (é admin da empresa), tem todas as permissões
-      if (!user.employee) {
-        return true;
-      }
-
-      // Verificar permissões do role do employee
-      const role = user.employee.role;
-      if (!role || !role.permissions) {
-        return false;
-      }
-
-      // Verificar se a permissão está na lista de permissões do role
-      return role.permissions.includes(permission);
     } catch (error) {
-      logger.error(error, 'AuthService.hasPermission');
+      logger.error({ err: error }, 'AuthService.hasPermission');
       return false;
     }
   }
 
   private async generateTokens(userId: string, companyId: string): Promise<RefreshTokenResponseDto> {
-    const payload = { userId, companyId };
+    if (!companyId) {
+      throw new Error('CompanyId é obrigatório para gerar tokens');
+    }
 
-    const accessTokenOptions: SignOptions = {
-      expiresIn: config.JWT_EXPIRES_IN,
-    };
+    const payload: JwtPayload = { userId, companyId };
 
-    const refreshTokenOptions: SignOptions = {
-      expiresIn: config.JWT_REFRESH_EXPIRES_IN,
-    };
-
-    const accessToken = jwt.sign(payload, config.JWT_SECRET, accessTokenOptions);
-    const refreshToken = jwt.sign(payload, config.JWT_SECRET, refreshTokenOptions);
+    const secret: Secret = config.JWT_SECRET as unknown as Secret;
+    const accessOptions = ({ expiresIn: config.JWT_EXPIRES_IN } as unknown) as SignOptions;
+    const refreshOptions = ({ expiresIn: config.JWT_REFRESH_EXPIRES_IN } as unknown) as SignOptions;
+    const accessToken = jwt.sign(payload, secret, accessOptions);
+    const refreshToken = jwt.sign(payload, secret, refreshOptions);
 
     return {
       accessToken,

@@ -3,9 +3,7 @@ import { z } from 'zod';
 // Schema para movimentação de estoque
 export const stockMovementSchema = z.object({
   productId: z.string().uuid('ID do produto deve ser um UUID válido'),
-  type: z.enum(['IN', 'OUT', 'ADJUSTMENT', 'TRANSFER'], {
-    errorMap: () => ({ message: 'Tipo deve ser IN, OUT, ADJUSTMENT ou TRANSFER' })
-  }),
+  type: z.enum(['IN', 'OUT', 'ADJUSTMENT', 'TRANSFER']),
   quantity: z.number().positive('Quantidade deve ser maior que zero'),
   unitCost: z.number().min(0, 'Custo unitário não pode ser negativo').optional(),
   reason: z.string().min(1, 'Motivo é obrigatório').max(500, 'Motivo deve ter no máximo 500 caracteres'),
@@ -14,7 +12,7 @@ export const stockMovementSchema = z.object({
   destinationLocationId: z.string().uuid('ID da localização de destino deve ser um UUID válido').optional(),
   batchNumber: z.string().max(50, 'Número do lote deve ter no máximo 50 caracteres').optional(),
   expirationDate: z.string().datetime('Data de validade deve ser uma data válida').optional(),
-  notes: z.string().max(1000, 'Observações devem ter no máximo 1000 caracteres').optional()
+  notes: z.string().max(1000, 'Observações devem ter no máximo 1000 caracteres').optional(),
 });
 
 // Schema para ajuste de estoque
@@ -23,7 +21,7 @@ export const stockAdjustmentSchema = z.object({
   newQuantity: z.number().min(0, 'Nova quantidade não pode ser negativa'),
   reason: z.string().min(1, 'Motivo é obrigatório').max(500, 'Motivo deve ter no máximo 500 caracteres'),
   locationId: z.string().uuid('ID da localização deve ser um UUID válido').optional(),
-  notes: z.string().max(1000, 'Observações devem ter no máximo 1000 caracteres').optional()
+  notes: z.string().max(1000, 'Observações devem ter no máximo 1000 caracteres').optional(),
 });
 
 // Schema para transferência de estoque
@@ -33,7 +31,7 @@ export const stockTransferSchema = z.object({
   toLocationId: z.string().uuid('ID da localização de destino deve ser um UUID válido'),
   quantity: z.number().positive('Quantidade deve ser maior que zero'),
   reason: z.string().min(1, 'Motivo é obrigatório').max(500, 'Motivo deve ter no máximo 500 caracteres'),
-  notes: z.string().max(1000, 'Observações devem ter no máximo 1000 caracteres').optional()
+  notes: z.string().max(1000, 'Observações devem ter no máximo 1000 caracteres').optional(),
 });
 
 // Schema para reserva de estoque
@@ -42,18 +40,16 @@ export const stockReservationSchema = z.object({
   quantity: z.number().positive('Quantidade deve ser maior que zero'),
   reason: z.string().min(1, 'Motivo é obrigatório').max(500, 'Motivo deve ter no máximo 500 caracteres'),
   referenceId: z.string().uuid('ID de referência deve ser um UUID válido').optional(),
-  referenceType: z.enum(['QUOTE', 'ORDER', 'OTHER'], {
-    errorMap: () => ({ message: 'Tipo de referência deve ser QUOTE, ORDER ou OTHER' })
-  }).optional(),
+  referenceType: z.enum(['QUOTE', 'ORDER', 'OTHER']).optional(),
   expiresAt: z.string().datetime('Data de expiração deve ser uma data válida').optional(),
   locationId: z.string().uuid('ID da localização deve ser um UUID válido').optional(),
-  notes: z.string().max(1000, 'Observações devem ter no máximo 1000 caracteres').optional()
+  notes: z.string().max(1000, 'Observações devem ter no máximo 1000 caracteres').optional(),
 });
 
 // Schema para cancelar reserva
 export const cancelStockReservationSchema = z.object({
   reason: z.string().min(1, 'Motivo é obrigatório').max(500, 'Motivo deve ter no máximo 500 caracteres'),
-  notes: z.string().max(1000, 'Observações devem ter no máximo 1000 caracteres').optional()
+  notes: z.string().max(1000, 'Observações devem ter no máximo 1000 caracteres').optional(),
 });
 
 // Schema para filtros de estoque
@@ -66,8 +62,10 @@ export const stockFiltersSchema = z.object({
   search: z.string().optional(),
   page: z.number().int().min(1).default(1),
   limit: z.number().int().min(1).max(100).default(20),
-  sortBy: z.enum(['productName', 'quantity', 'unitCost', 'totalValue', 'lastMovement']).default('productName'),
-  sortOrder: z.enum(['asc', 'desc']).default('asc')
+  sortBy: z
+    .enum(['productName', 'quantity', 'unitCost', 'totalValue', 'lastMovement'])
+    .default('productName'),
+  sortOrder: z.enum(['asc', 'desc']).default('asc'),
 });
 
 // Schema para filtros de movimentações
@@ -82,7 +80,7 @@ export const stockMovementFiltersSchema = z.object({
   page: z.number().int().min(1).default(1),
   limit: z.number().int().min(1).max(100).default(20),
   sortBy: z.enum(['createdAt', 'type', 'quantity', 'unitCost']).default('createdAt'),
-  sortOrder: z.enum(['asc', 'desc']).default('desc')
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });
 
 // Schema para filtros de reservas
@@ -97,7 +95,7 @@ export const stockReservationFiltersSchema = z.object({
   page: z.number().int().min(1).default(1),
   limit: z.number().int().min(1).max(100).default(20),
   sortBy: z.enum(['createdAt', 'expiresAt', 'quantity']).default('createdAt'),
-  sortOrder: z.enum(['asc', 'desc']).default('desc')
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });
 
 // Schema para localização de estoque
@@ -105,11 +103,9 @@ export const createStockLocationSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório').max(100, 'Nome deve ter no máximo 100 caracteres'),
   code: z.string().min(1, 'Código é obrigatório').max(20, 'Código deve ter no máximo 20 caracteres'),
   description: z.string().max(500, 'Descrição deve ter no máximo 500 caracteres').optional(),
-  type: z.enum(['WAREHOUSE', 'STORE', 'VIRTUAL'], {
-    errorMap: () => ({ message: 'Tipo deve ser WAREHOUSE, STORE ou VIRTUAL' })
-  }),
+  type: z.enum(['WAREHOUSE', 'STORE', 'VIRTUAL']),
   address: z.string().max(500, 'Endereço deve ter no máximo 500 caracteres').optional(),
-  isActive: z.boolean().default(true)
+  isActive: z.boolean().default(true),
 });
 
 export const updateStockLocationSchema = createStockLocationSchema.partial();
@@ -129,11 +125,11 @@ export type UpdateStockLocationDTO = z.infer<typeof updateStockLocationSchema>;
 // Interfaces de resposta
 export interface StockItemResponseDTO {
   id: string;
-  productId: string;
+  productId: string | null;
   productName: string;
   productCode: string;
   productCategory: string;
-  locationId: string | null;
+  locationId: string;
   locationName: string | null;
   quantity: number;
   reservedQuantity: number;
@@ -163,21 +159,21 @@ export interface StockBatchResponseDTO {
 
 export interface StockMovementResponseDTO {
   id: string;
-  productId: string;
-  productName: string;
-  productCode: string;
+  productId: string | null;
+  productName: string | null;
+  productCode: string | null;
   type: 'IN' | 'OUT' | 'ADJUSTMENT' | 'TRANSFER';
   quantity: number;
   unitCost: number | null;
   totalCost: number | null;
-  reason: string;
+  reason: string | null;
   reference: string | null;
   locationId: string | null;
   locationName: string | null;
   destinationLocationId: string | null;
   destinationLocationName: string | null;
-  batchNumber: string | null;
-  expirationDate: string | null;
+  batchNumber?: string | null;
+  expirationDate?: string | null;
   notes: string | null;
   userId: string;
   userName: string;
@@ -186,17 +182,17 @@ export interface StockMovementResponseDTO {
 
 export interface StockReservationResponseDTO {
   id: string;
-  productId: string;
+  productId: string | null;
   productName: string;
   productCode: string;
   quantity: number;
-  reason: string;
-  referenceId: string | null;
-  referenceType: 'QUOTE' | 'ORDER' | 'OTHER' | null;
+  reason?: string | null;
+  referenceId?: string | null;
+  referenceType?: 'QUOTE' | 'ORDER' | 'OTHER' | null;
   status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'FULFILLED';
   expiresAt: string | null;
-  locationId: string | null;
-  locationName: string | null;
+  locationId: string;
+  locationName: string;
   notes: string | null;
   userId: string;
   userName: string;
@@ -207,7 +203,7 @@ export interface StockReservationResponseDTO {
 export interface StockLocationResponseDTO {
   id: string;
   name: string;
-  code: string;
+  code: string | null;
   description: string | null;
   type: 'WAREHOUSE' | 'STORE' | 'VIRTUAL';
   address: string | null;
@@ -228,7 +224,7 @@ export interface StockStatsDTO {
   totalReservations: number;
   expiredBatches: number;
   topProducts: {
-    productId: string;
+    productId: string | null;
     productName: string;
     quantity: number;
     value: number;
@@ -248,7 +244,7 @@ export interface StockStatsDTO {
 
 // DTOs para relatórios
 export interface StockReportDTO {
-  productId: string;
+  productId: string | null;
   productName: string;
   productCode: string;
   productCategory: string;
@@ -270,13 +266,13 @@ export interface StockReportDTO {
 
 export interface StockMovementReportDTO {
   date: string;
-  productName: string;
-  productCode: string;
+  productName: string | null;
+  productCode: string | null;
   type: string;
   quantity: number;
   unitCost: number | null;
   totalCost: number | null;
-  reason: string;
+  reason: string | null;
   reference: string | null;
   locationName: string | null;
   destinationLocationName: string | null;
@@ -291,7 +287,7 @@ export interface StockDashboardDTO {
   expiredBatches: StockBatchResponseDTO[];
   activeReservations: StockReservationResponseDTO[];
   topMovingProducts: {
-    productId: string;
+    productId: string | null;
     productName: string;
     totalMovements: number;
     totalQuantity: number;

@@ -37,7 +37,7 @@ export class AuthRepository {
           },
         },
       });
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error(error, 'AuthRepository.findUserByEmail');
       throw new Error('Falha ao buscar usuário');
     }

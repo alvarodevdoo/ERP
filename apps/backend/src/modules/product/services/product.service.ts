@@ -1,4 +1,14 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Product, Prisma } from '@prisma/client';
+
+interface ProductWithRelations extends Product {
+  barcode: string | null;
+  unitOfMeasure: string;
+  maxStock: Prisma.Decimal | null;
+  images: string[];
+  tags: string[];
+  isService: boolean;
+  hasVariations: boolean;
+}
 import {
   CreateProductDto,
   UpdateProductDto,
@@ -67,7 +77,7 @@ export class ProductService {
     // Calcular preços se não fornecidos
     const productData = this.calculatePrices(data);
 
-    const product = await this.productRepository.create(productData, companyId);
+    const product = await this.productRepository.create(productData as CreateProductDto, companyId);
 
     // Criar movimentação inicial de estoque se quantidade inicial > 0
     if (data.initialStock && data.initialStock > 0) {
@@ -77,7 +87,6 @@ export class ProductService {
           type: 'IN',
           quantity: data.initialStock,
           unitCost: data.costPrice || 0,
-          totalCost: (data.costPrice || 0) * data.initialStock,
           reason: 'Estoque inicial',
           reference: `INICIAL-${product.sku}`
         },
@@ -89,7 +98,7 @@ export class ProductService {
       await this.productRepository.updateStock(product.id, data.initialStock, companyId);
     }
 
-    return this.formatProductResponse(product);
+    return product;
   }
 
   /**
@@ -103,7 +112,7 @@ export class ProductService {
     await this.validatePermission(userId, companyId, 'products', 'read');
 
     const product = await this.productRepository.findById(id, companyId);
-    return product ? this.formatProductResponse(product) : null;
+    return product ? product : null;
   }
 
   /**
@@ -117,14 +126,7 @@ export class ProductService {
     await this.validatePermission(userId, companyId, 'products', 'read');
 
     const result = await this.productRepository.findMany(filters, companyId);
-
-    return {
-      products: result.products.map(product => this.formatProductResponse(product)),
-      total: result.total,
-      page: result.page,
-      limit: result.limit,
-      totalPages: result.totalPages
-    };
+    return result;
   }
 
   /**
@@ -170,7 +172,7 @@ export class ProductService {
     const productData = this.calculatePrices(data);
 
     const product = await this.productRepository.update(id, productData, companyId);
-    return this.formatProductResponse(product);
+    return product;
   }
 
   /**
@@ -203,7 +205,7 @@ export class ProductService {
     await this.validatePermission(userId, companyId, 'products', 'update');
 
     const product = await this.productRepository.restore(id, companyId);
-    return this.formatProductResponse(product);
+    return product;
   }
 
   /**
@@ -219,11 +221,10 @@ export class ProductService {
 
     const products = await this.productRepository.findByCategory(
       categoryId,
-      companyId,
-      includeInactive
+      companyId
     );
 
-    return products.map(product => this.formatProductResponse(product));
+    return products;
   }
 
   /**
@@ -236,7 +237,7 @@ export class ProductService {
     await this.validatePermission(userId, companyId, 'products', 'read');
 
     const products = await this.productRepository.findLowStock(companyId);
-    return products.map(product => this.formatProductResponse(product));
+    return products;
   }
 
   /**
@@ -249,7 +250,7 @@ export class ProductService {
     await this.validatePermission(userId, companyId, 'products', 'read');
 
     const products = await this.productRepository.findOutOfStock(companyId);
-    return products.map(product => this.formatProductResponse(product));
+    return products;
   }
 
   /**
@@ -297,7 +298,6 @@ export class ProductService {
         type: movementType,
         quantity: movementQuantity,
         unitCost: product.costPrice || 0,
-        totalCost: (product.costPrice || 0) * movementQuantity,
         reason: reason || `${movementType === 'IN' ? 'Entrada' : 'Saída'} manual`,
         reference: reference || `MANUAL-${Date.now()}`
       },
@@ -307,9 +307,12 @@ export class ProductService {
 
     // Atualizar estoque do produto
     const newStock = Math.max(0, product.currentStock + quantity);
-    const updatedProduct = await this.productRepository.updateStock(id, newStock, companyId);
-
-    return this.formatProductResponse(updatedProduct);
+    await this.productRepository.updateStock(id, newStock, companyId);
+    const refreshed = await this.productRepository.findById(id, companyId);
+    if (!refreshed) {
+      throw new AppError('Produto não encontrado após atualização de estoque', 404);
+    }
+    return refreshed;
   }
 
   /**
@@ -345,7 +348,6 @@ export class ProductService {
           type: 'ADJUSTMENT',
           quantity: adjustment,
           unitCost: product.costPrice || 0,
-          totalCost: (product.costPrice || 0) * Math.abs(adjustment),
           reason: reason || 'Ajuste de estoque',
           reference: `AJUSTE-${Date.now()}`
         },
@@ -354,11 +356,15 @@ export class ProductService {
       );
 
       // Atualizar estoque do produto
-      const updatedProduct = await this.productRepository.updateStock(id, newQuantity, companyId);
-      return this.formatProductResponse(updatedProduct);
+      await this.productRepository.updateStock(id, newQuantity, companyId);
+      const refreshed = await this.productRepository.findById(id, companyId);
+      if (!refreshed) {
+        throw new AppError('Produto não encontrado após ajuste de estoque', 404);
+      }
+      return refreshed;
     }
 
-    return this.formatProductResponse(product);
+    return product;
   }
 
   /**
@@ -430,13 +436,13 @@ export class ProductService {
     if (data.weight !== undefined && data.weight < 0) {
       throw new AppError('Peso não pode ser negativo', 400);
     }
-    if (data.length !== undefined && data.length < 0) {
+    if (data.dimensions?.length !== undefined && data.dimensions.length < 0) {
       throw new AppError('Comprimento não pode ser negativo', 400);
     }
-    if (data.width !== undefined && data.width < 0) {
+    if (data.dimensions?.width !== undefined && data.dimensions.width < 0) {
       throw new AppError('Largura não pode ser negativa', 400);
     }
-    if (data.height !== undefined && data.height < 0) {
+    if (data.dimensions?.height !== undefined && data.dimensions.height < 0) {
       throw new AppError('Altura não pode ser negativa', 400);
     }
   }
@@ -448,13 +454,13 @@ export class ProductService {
     const result = { ...data };
 
     // Se tem preço de custo e margem, calcular preço de venda
-    if (data.costPrice && data.profitMargin && !data.salePrice) {
-      result.salePrice = data.costPrice * (1 + data.profitMargin / 100);
+    if (result.costPrice && result.profitMargin && !result.salePrice) {
+      result.salePrice = result.costPrice * (1 + result.profitMargin / 100);
     }
 
     // Se tem preço de venda e preço de custo, calcular margem
-    if (data.salePrice && data.costPrice && !data.profitMargin) {
-      result.profitMargin = ((data.salePrice - data.costPrice) / data.costPrice) * 100;
+    if (result.salePrice && result.costPrice && !result.profitMargin) {
+      result.profitMargin = ((result.salePrice - result.costPrice) / result.costPrice) * 100;
     }
 
     return result;
@@ -501,10 +507,10 @@ export class ProductService {
       }
 
       // Verificar se produto está em ordens de serviço
-      const orderItemCount = await this.prisma.serviceOrderItem.count({
+      const orderItemCount = await this.prisma.orderItem.count({
         where: {
           productId,
-          serviceOrder: {
+          order: {
             companyId
           }
         }
@@ -549,30 +555,35 @@ export class ProductService {
   /**
    * Formatar resposta do produto
    */
-  private formatProductResponse(product: Product & { category?: ProductCategoryResponseDto }): ProductResponseDto {
+  // 
+  private formatProductResponse(product: ProductWithRelations & { category?: ProductCategoryResponseDto }): ProductResponseDto {
     return {
       id: product.id,
       name: product.name,
       description: product.description,
       sku: product.sku,
-      barcode: product.barcode,
-      categoryId: product.categoryId,
+      barcode: product.barcode || null,
+      categoryId: product.categoryId ?? null,
       category: product.category,
-      unit: product.unit,
-      costPrice: product.costPrice,
-      salePrice: product.salePrice,
-      wholesalePrice: product.wholesalePrice,
-      profitMargin: product.profitMargin,
+      unitOfMeasure: product.unitOfMeasure,
+      unit: product.unitOfMeasure,
+      costPrice: product.costPrice.toNumber(),
+      salePrice: product.salePrice.toNumber(),
+      wholesalePrice: product.wholesalePrice?.toNumber() || null,
+      profitMargin: product.profitMargin?.toNumber() || null,
       trackStock: product.trackStock,
       currentStock: product.currentStock,
       minStock: product.minStock,
-      maxStock: product.maxStock,
-      weight: product.weight,
-      length: product.length,
-      width: product.width,
-      height: product.height,
-      images: product.images,
+      maxStock: product.maxStock?.toNumber() || null,
+      weight: product.weight?.toNumber() || null,
+      length: product.length?.toNumber() || null,
+      width: product.width?.toNumber() || null,
+      height: product.height?.toNumber() || null,
+      images: product.images || [],
       isActive: product.isActive,
+      isService: product.isService,
+      hasVariations: product.hasVariations,
+      tags: product.tags || [],
       companyId: product.companyId,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,

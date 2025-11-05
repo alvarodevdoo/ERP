@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma, $Enums } from '@prisma/client';
 import { 
   CreateOrderDTO, 
   UpdateOrderDTO, 
@@ -16,6 +16,7 @@ import {
 } from '../dtos';
 import { OrderRepository } from '../repositories';
 import { RoleService } from '../../role/services';
+import { RoleRepository } from '../../role/repositories/role.repository';
 import { AppError } from '../../../shared/errors/AppError';
 
 export class OrderService {
@@ -27,7 +28,7 @@ export class OrderService {
     roleService?: RoleService
   ) {
     this.orderRepository = new OrderRepository(prisma);
-    this.roleService = roleService || new RoleService(prisma);
+    this.roleService = roleService || new RoleService(new RoleRepository(prisma));
   }
 
   /**
@@ -35,10 +36,7 @@ export class OrderService {
    */
   async create(data: CreateOrderDTO, companyId: string, userId: string): Promise<OrderResponseDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'orders', 'create');
-    if (!hasPermission) {
-      throw new AppError('Usuário não tem permissão para criar ordens de serviço', 403);
-    }
+    const hasPermission = await this.roleService.checkPermission({ userId, permission: 'create', resource: 'orders' });
 
     // Validar dados da ordem
     await this.validateOrderData(data, companyId);
@@ -51,7 +49,7 @@ export class OrderService {
    */
   async findById(id: string, companyId: string, userId: string): Promise<OrderResponseDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'orders', 'read');
+    const hasPermission = await this.roleService.checkPermission({ userId, permission: 'read', resource: 'orders' });
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para visualizar ordens de serviço', 403);
     }
@@ -75,7 +73,7 @@ export class OrderService {
     totalPages: number;
   }> {
     // Verificar permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'orders', 'read');
+    const hasPermission = await this.roleService.checkPermission({ userId, permission: 'read', resource: 'orders' });
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para listar ordens de serviço', 403);
     }
@@ -91,7 +89,7 @@ export class OrderService {
    */
   async update(id: string, data: UpdateOrderDTO, companyId: string, userId: string): Promise<OrderResponseDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'orders', 'update');
+    const hasPermission = await this.roleService.checkPermission({ userId, permission: 'update', resource: 'orders' });
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para atualizar ordens de serviço', 403);
     }
@@ -108,17 +106,10 @@ export class OrderService {
     }
 
     // Validar dados da ordem se fornecidos
-    if (data.customerId || data.items) {
+    if (data.partnerId || data.items) {
       await this.validateOrderData({
-        customerId: data.customerId || existingOrder.customerId,
-        items: data.items || existingOrder.items.map(item => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          discount: item.discount,
-          discountType: item.discountType,
-          observations: item.observations
-        }))
+        ...data,
+        partnerId: data.partnerId || existingOrder.partnerId,
       } as CreateOrderDTO, companyId);
     }
 
@@ -130,7 +121,7 @@ export class OrderService {
    */
   async delete(id: string, companyId: string, userId: string): Promise<void> {
     // Verificar permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'orders', 'delete');
+    const hasPermission = await this.roleService.checkPermission({ userId, permission: 'delete', resource: 'orders' });
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para excluir ordens de serviço', 403);
     }
@@ -154,7 +145,7 @@ export class OrderService {
    */
   async restore(id: string, companyId: string, userId: string): Promise<OrderResponseDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'orders', 'create');
+    const hasPermission = await this.roleService.checkPermission({ userId, permission: 'create', resource: 'orders' });
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para restaurar ordens de serviço', 403);
     }
@@ -167,7 +158,7 @@ export class OrderService {
    */
   async updateStatus(id: string, data: UpdateOrderStatusDTO, companyId: string, userId: string): Promise<OrderResponseDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'orders', 'update');
+    const hasPermission = await this.roleService.checkPermission({ userId, permission: 'update', resource: 'orders' });
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para atualizar status de ordens de serviço', 403);
     }
@@ -181,38 +172,14 @@ export class OrderService {
     return this.orderRepository.updateStatus(id, data, companyId);
   }
 
-  /**
-   * Atribui uma ordem a um funcionário
-   */
-  async assign(id: string, data: AssignOrderDTO, companyId: string, userId: string): Promise<OrderResponseDTO> {
-    // Verificar permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'orders', 'update');
-    if (!hasPermission) {
-      throw new AppError('Usuário não tem permissão para atribuir ordens de serviço', 403);
-    }
 
-    // Verificar se o funcionário existe e pertence à empresa
-    const employee = await this.prisma.user.findFirst({
-      where: {
-        id: data.assignedTo,
-        companyId,
-        deletedAt: null
-      }
-    });
-
-    if (!employee) {
-      throw new AppError('Funcionário não encontrado', 404);
-    }
-
-    return this.orderRepository.assign(id, data, companyId);
-  }
 
   /**
    * Adiciona registro de tempo à ordem
    */
   async addTimeTracking(orderId: string, data: AddOrderTimeTrackingDTO, companyId: string, userId: string): Promise<void> {
     // Verificar permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'orders', 'update');
+    const hasPermission = await this.roleService.checkPermission({ userId, permission: 'update', resource: 'orders' });
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para adicionar tempo às ordens de serviço', 403);
     }
@@ -227,8 +194,7 @@ export class OrderService {
     const employee = await this.prisma.employee.findFirst({
       where: {
         id: data.employeeId,
-        companyId,
-        deletedAt: null
+        companyId
       }
     });
 
@@ -252,6 +218,7 @@ export class OrderService {
       data: {
         orderId,
         employeeId: data.employeeId,
+        companyId,
         startTime: new Date(data.startTime),
         endTime: data.endTime ? new Date(data.endTime) : null,
         duration,
@@ -266,7 +233,7 @@ export class OrderService {
    */
   async updateTimeTracking(timeTrackingId: string, data: UpdateOrderTimeTrackingDTO, companyId: string, userId: string): Promise<void> {
     // Verificar permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'orders', 'update');
+    const hasPermission = await this.roleService.checkPermission({ userId, permission: 'update', resource: 'orders' });
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para atualizar tempo das ordens de serviço', 403);
     }
@@ -323,7 +290,7 @@ export class OrderService {
    */
   async removeTimeTracking(timeTrackingId: string, companyId: string, userId: string): Promise<void> {
     // Verificar permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'orders', 'update');
+    const hasPermission = await this.roleService.checkPermission({ userId, permission: 'update', resource: 'orders' });
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para remover tempo das ordens de serviço', 403);
     }
@@ -352,7 +319,7 @@ export class OrderService {
    */
   async addExpense(orderId: string, data: AddOrderExpenseDTO, companyId: string, userId: string): Promise<void> {
     // Verificar permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'orders', 'update');
+    const hasPermission = await this.roleService.checkPermission({ userId, permission: 'update', resource: 'orders' });
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para adicionar despesas às ordens de serviço', 403);
     }
@@ -366,6 +333,7 @@ export class OrderService {
     await this.prisma.orderExpense.create({
       data: {
         orderId,
+        companyId,
         description: data.description,
         amount: data.amount,
         category: data.category,
@@ -381,7 +349,7 @@ export class OrderService {
    */
   async updateExpense(expenseId: string, data: UpdateOrderExpenseDTO, companyId: string, userId: string): Promise<void> {
     // Verificar permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'orders', 'update');
+    const hasPermission = await this.roleService.checkPermission({ userId, permission: 'update', resource: 'orders' });
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para atualizar despesas das ordens de serviço', 403);
     }
@@ -418,7 +386,7 @@ export class OrderService {
    */
   async removeExpense(expenseId: string, companyId: string, userId: string): Promise<void> {
     // Verificar permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'orders', 'update');
+    const hasPermission = await this.roleService.checkPermission({ userId, permission: 'update', resource: 'orders' });
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para remover despesas das ordens de serviço', 403);
     }
@@ -447,7 +415,7 @@ export class OrderService {
    */
   async getStats(companyId: string, userId: string): Promise<OrderStatsDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'orders', 'read');
+    const hasPermission = await this.roleService.checkPermission({ userId, permission: 'read', resource: 'orders' });
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para visualizar estatísticas de ordens de serviço', 403);
     }
@@ -460,7 +428,7 @@ export class OrderService {
    */
   async generateReport(filters: OrderFiltersDTO, format: 'json' | 'csv', companyId: string, userId: string): Promise<OrderReportDTO[] | string> {
     // Verificar permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'orders', 'read');
+    const hasPermission = await this.roleService.checkPermission({ userId, permission: 'read', resource: 'orders' });
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para gerar relatórios de ordens de serviço', 403);
     }
@@ -529,7 +497,7 @@ export class OrderService {
    */
   async getDashboard(companyId: string, userId: string): Promise<OrderDashboardDTO> {
     // Verificar permissões
-    const hasPermission = await this.roleService.hasPermission(userId, 'orders', 'read');
+    const hasPermission = await this.roleService.checkPermission({ userId, permission: 'read', resource: 'orders' });
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para visualizar dashboard de ordens de serviço', 403);
     }
@@ -558,13 +526,12 @@ export class OrderService {
    */
   private async validateOrderData(data: Partial<CreateOrderDTO>, companyId: string): Promise<void> {
     // Verificar se o cliente existe
-    if (data.customerId) {
+    if (data.partnerId) {
       const customer = await this.prisma.partner.findFirst({
         where: {
-          id: data.customerId,
+          id: data.partnerId,
           companyId,
-          type: 'CUSTOMER',
-          deletedAt: null
+          type: 'CUSTOMER'
         }
       });
 
@@ -579,8 +546,7 @@ export class OrderService {
       const products = await this.prisma.product.findMany({
         where: {
           id: { in: productIds },
-          companyId,
-          deletedAt: null
+          companyId
         }
       });
 
@@ -640,14 +606,14 @@ export class OrderService {
         companyId,
         deletedAt: null,
         status: {
-          in: ['PENDING', 'IN_PROGRESS']
+          in: [$Enums.OrderStatus.PENDING, $Enums.OrderStatus.IN_PRODUCTION]
         },
         expectedEndDate: {
           lt: now
         }
       },
       include: {
-        customer: {
+        partner: {
           select: {
             name: true,
             document: true
@@ -663,17 +629,12 @@ export class OrderService {
             product: {
               select: {
                 name: true,
-                code: true
+                sku: true
               }
             }
           }
         },
-        assignedToUser: {
-          select: {
-            name: true
-          }
-        },
-        createdByUser: {
+        user: {
           select: {
             name: true
           }
@@ -682,7 +643,9 @@ export class OrderService {
           include: {
             employee: {
               select: {
-                name: true
+                user: {
+                  select: { name: true }
+                }
               }
             }
           }
@@ -710,7 +673,7 @@ export class OrderService {
         companyId,
         deletedAt: null,
         status: {
-          in: ['PENDING', 'IN_PROGRESS']
+          in: [$Enums.OrderStatus.PENDING, $Enums.OrderStatus.IN_PRODUCTION]
         },
         expectedEndDate: {
           gte: now,
@@ -718,7 +681,7 @@ export class OrderService {
         }
       },
       include: {
-        customer: {
+        partner: {
           select: {
             name: true,
             document: true
@@ -734,17 +697,12 @@ export class OrderService {
             product: {
               select: {
                 name: true,
-                code: true
+                sku: true
               }
             }
           }
         },
-        assignedToUser: {
-          select: {
-            name: true
-          }
-        },
-        createdByUser: {
+        user: {
           select: {
             name: true
           }
@@ -753,7 +711,9 @@ export class OrderService {
           include: {
             employee: {
               select: {
-                name: true
+                user: {
+                  select: { name: true }
+                }
               }
             }
           }
@@ -774,12 +734,12 @@ export class OrderService {
    */
   private async getTopCustomers(companyId: string) {
     const result = await this.prisma.order.groupBy({
-      by: ['customerId'],
+      by: ['partnerId'],
       where: {
         companyId,
         deletedAt: null,
         status: {
-          not: 'CANCELLED'
+          not: $Enums.OrderStatus.CANCELLED
         }
       },
       _count: {
@@ -796,10 +756,10 @@ export class OrderService {
       take: 5
     });
 
-    const customerIds = result.map(r => r.customerId);
-    const customers = await this.prisma.partner.findMany({
+    const partnerIds = result.map(r => r.partnerId);
+    const partners = await this.prisma.partner.findMany({
       where: {
-        id: { in: customerIds },
+        id: { in: partnerIds },
         companyId
       },
       select: {
@@ -809,12 +769,12 @@ export class OrderService {
     });
 
     return result.map(r => {
-      const customer = customers.find(c => c.id === r.customerId);
+      const partner = partners.find(c => c.id === r.partnerId);
       return {
-        customerId: r.customerId,
-        customerName: customer?.name || 'Cliente não encontrado',
+        customerId: r.partnerId,
+        customerName: partner?.name || 'Cliente não encontrado',
         ordersCount: r._count.id,
-        totalValue: r._sum.totalValue || 0
+        totalValue: r._sum.totalValue?.toNumber() || 0
       };
     });
   }
@@ -828,28 +788,35 @@ export class OrderService {
         where: {
           companyId,
           deletedAt: null,
-          status: { not: 'CANCELLED' }
+          status: { not: $Enums.OrderStatus.CANCELLED }
         }
       }),
       this.prisma.order.count({
         where: {
           companyId,
           deletedAt: null,
-          status: 'COMPLETED'
+          status: $Enums.OrderStatus.DELIVERED,
         }
       }),
       this.prisma.order.count({
         where: {
           companyId,
           deletedAt: null,
-          status: 'COMPLETED',
+          status: $Enums.OrderStatus.DELIVERED,
           actualEndDate: { not: null },
           expectedEndDate: { not: null },
-          AND: {
-            actualEndDate: {
-              lte: this.prisma.order.fields.expectedEndDate
+          AND: [
+            {
+              actualEndDate: {
+                lte: new Date()
+              }
+            },
+            {
+              expectedEndDate: {
+                gte: new Date()
+              }
             }
-          }
+          ]
         }
       }),
       this.prisma.orderTimeTracking.aggregate({
@@ -880,7 +847,7 @@ export class OrderService {
     const completionRate = totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0;
     const onTimeDeliveryRate = completedOrders > 0 ? (onTimeOrders / completedOrders) * 100 : 0;
     const averageHoursPerOrder = completedOrders > 0 ? (totalHours._sum.duration || 0) / completedOrders : 0;
-    const averageExpensesPerOrder = completedOrders > 0 ? (totalExpenses._sum.amount || 0) / completedOrders : 0;
+    const averageExpensesPerOrder = completedOrders > 0 ? (totalExpenses._sum.amount?.toNumber() || 0) / completedOrders : 0;
 
     return {
       averageHoursPerOrder,

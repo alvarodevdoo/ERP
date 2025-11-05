@@ -12,6 +12,7 @@ import {
 import { AppError } from '../../../shared/errors/AppError';
 import { validateCPF } from '../../../shared/utils/validators';
 import { RoleService } from '../../role/services';
+import { RoleRepository } from '../../role/repositories/role.repository';
 
 /**
  * Service para gerenciamento de funcionários
@@ -22,10 +23,11 @@ export class EmployeeService {
   private roleService: RoleService;
 
   constructor(
+    employeeRepository?: EmployeeRepository,
     roleService?: RoleService
   ) {
-    this.employeeRepository = new EmployeeRepository();
-    this.roleService = roleService || new RoleService();
+    this.employeeRepository = employeeRepository || new EmployeeRepository();
+    this.roleService = roleService || new RoleService(new RoleRepository(this.employeeRepository.prisma));
   }
 
   /**
@@ -43,48 +45,16 @@ export class EmployeeService {
     // Validar permissão
     await this.validatePermission(userId, 'employee', 'create');
 
-    // Validar CPF
-    if (!validateCPF(data.cpf)) {
-      throw new AppError('CPF inválido', 400);
-    }
-
-    // Verificar se CPF já existe na empresa
-    const existingCpf = await this.employeeRepository.cpfExists(
-      data.cpf,
-      companyId
-    );
-    if (existingCpf) {
-      throw new AppError('CPF já cadastrado na empresa', 409);
-    }
-
-    // Verificar se email já existe na empresa (se fornecido)
-    if (data.email) {
-      const existingEmail = await this.employeeRepository.emailExists(
-        data.email,
-        companyId
-      );
-      if (existingEmail) {
-        throw new AppError('Email já cadastrado na empresa', 409);
+    // Validar data de admissão (não pode ser futura) se fornecida
+    if (data.hireDate) {
+      const hireDate = new Date(data.hireDate);
+      if (hireDate > new Date()) {
+        throw new AppError('Data de admissão não pode ser futura', 400);
       }
     }
 
-    // Validar data de nascimento (deve ser maior de 16 anos)
-    const birthDate = new Date(data.birthDate);
-    const minAge = new Date();
-    minAge.setFullYear(minAge.getFullYear() - 16);
-    
-    if (birthDate > minAge) {
-      throw new AppError('Funcionário deve ter pelo menos 16 anos', 400);
-    }
-
-    // Validar data de admissão (não pode ser futura)
-    const hireDate = new Date(data.hireDate);
-    if (hireDate > new Date()) {
-      throw new AppError('Data de admissão não pode ser futura', 400);
-    }
-
-    // Validar salário
-    if (data.salary <= 0) {
+    // Validar salário se fornecido
+    if (data.salary !== undefined && data.salary <= 0) {
       throw new AppError('Salário deve ser maior que zero', 400);
     }
 
@@ -138,7 +108,8 @@ export class EmployeeService {
     // Validar permissão
     await this.validatePermission(userId, 'employee', 'read');
 
-    const result = await this.employeeRepository.findMany(filters, companyId);
+    // Incluir companyId nos filtros, conforme assinatura do repositório
+    const result = await this.employeeRepository.findMany({ ...filters, companyId });
 
     return {
       data: result.data.map(employee => this.formatEmployeeResponse(employee)),
@@ -172,49 +143,17 @@ export class EmployeeService {
       throw new AppError('Funcionário não encontrado', 404);
     }
 
-    // Validar CPF se fornecido
-    if (data.cpf && !validateCPF(data.cpf)) {
-      throw new AppError('CPF inválido', 400);
-    }
-
-    // Verificar se CPF já existe (excluindo o funcionário atual)
-    if (data.cpf && data.cpf !== existingEmployee.cpf) {
-      const existingCpf = await this.employeeRepository.cpfExists(
-        data.cpf,
-        companyId,
-        id
-      );
-      if (existingCpf) {
-        throw new AppError('CPF já cadastrado na empresa', 409);
-      }
-    }
-
-    // Verificar se email já existe (excluindo o funcionário atual)
-    if (data.email && data.email !== existingEmployee.email) {
-      const existingEmail = await this.employeeRepository.emailExists(
-        data.email,
-        companyId,
-        id
-      );
-      if (existingEmail) {
-        throw new AppError('Email já cadastrado na empresa', 409);
-      }
-    }
-
-    // Validar data de nascimento se fornecida
-    if (data.birthDate) {
-      const birthDate = new Date(data.birthDate);
-      const minAge = new Date();
-      minAge.setFullYear(minAge.getFullYear() - 16);
-      
-      if (birthDate > minAge) {
-        throw new AppError('Funcionário deve ter pelo menos 16 anos', 400);
-      }
-    }
-
     // Validar salário se fornecido
     if (data.salary !== undefined && data.salary <= 0) {
       throw new AppError('Salário deve ser maior que zero', 400);
+    }
+
+    // Validar data de admissão (não pode ser futura) se fornecida
+    if (data.hireDate) {
+      const hireDate = new Date(data.hireDate);
+      if (hireDate > new Date()) {
+        throw new AppError('Data de admissão não pode ser futura', 400);
+      }
     }
 
     try {
@@ -399,6 +338,20 @@ export class EmployeeService {
   }
 
   /**
+   * Verifica se existe funcionário com o email informado na empresa
+   */
+  async emailExists(email: string, companyId: string, _userId?: string): Promise<boolean> {
+    return this.employeeRepository.emailExists(email, companyId);
+  }
+
+  /**
+   * Verifica se existe funcionário com o CPF informado na empresa
+   */
+  async cpfExists(cpf: string, companyId: string, _userId?: string): Promise<boolean> {
+    return this.employeeRepository.cpfExists(cpf, companyId);
+  }
+
+  /**
    * Busca funcionários para relatório
    * @param companyId ID da empresa
    * @param userId ID do usuário
@@ -489,11 +442,11 @@ export class EmployeeService {
     resource: string,
     action: string
   ): Promise<void> {
-    const hasPermission = await this.roleService.checkPermission(
+    const hasPermission = await this.roleService.checkPermission({
       userId,
       resource,
-      action
-    );
+      permission: action,
+    });
 
     if (!hasPermission) {
       throw new AppError('Acesso negado', 403);
@@ -505,38 +458,39 @@ export class EmployeeService {
    * @param employee Dados do funcionário
    * @returns Funcionário formatado
    */
-  private formatEmployeeResponse(employee: Record<string, unknown>): EmployeeResponseDto {
+  private formatEmployeeResponse(employee: any): EmployeeResponseDto {
+    const hireDateIso = employee.hireDate instanceof Date
+      ? employee.hireDate.toISOString()
+      : employee.hireDate;
+    const createdAtIso = employee.createdAt instanceof Date
+      ? employee.createdAt.toISOString()
+      : employee.createdAt;
+    const updatedAtIso = employee.updatedAt instanceof Date
+      ? employee.updatedAt.toISOString()
+      : employee.updatedAt;
+
     return {
       id: employee.id,
-      name: employee.name,
-      email: employee.email,
-      cpf: employee.cpf,
-      rg: employee.rg,
-      birthDate: employee.birthDate.toISOString().split('T')[0],
-      phone: employee.phone,
-      address: employee.address,
-      city: employee.city,
-      state: employee.state,
-      zipCode: employee.zipCode,
-      position: employee.position,
-      department: employee.department,
-      salary: employee.salary,
-      hireDate: employee.hireDate.toISOString().split('T')[0],
-      terminationDate: employee.terminationDate
-        ? employee.terminationDate.toISOString().split('T')[0]
-        : null,
-      status: employee.status,
-      bankAccount: employee.bankAccount,
-      emergencyContact: employee.emergencyContact,
-      notes: employee.notes,
       userId: employee.userId,
       companyId: employee.companyId,
-      createdAt: employee.createdAt.toISOString(),
-      updatedAt: employee.updatedAt.toISOString(),
-      deletedAt: employee.deletedAt?.toISOString() || null,
-      // Campos calculados
-      age: this.calculateAge(employee.birthDate.toISOString()),
-      companyTime: this.calculateCompanyTime(employee.hireDate.toISOString())
+      roleId: employee.roleId,
+      employeeNumber: employee.employeeNumber,
+      department: employee.department ?? null,
+      position: employee.position ?? null,
+      salary: employee.salary != null ? Number(employee.salary) : null,
+      hireDate: hireDateIso,
+      isActive: employee.isActive ?? true,
+      createdAt: createdAtIso,
+      updatedAt: updatedAtIso,
+      user: employee.user
+        ? { id: employee.user.id, name: employee.user.name, email: employee.user.email }
+        : undefined,
+      company: employee.company
+        ? { id: employee.company.id, name: employee.company.name, tradeName: employee.company.tradeName ?? null }
+        : undefined,
+      role: employee.role
+        ? { id: employee.role.id, name: employee.role.name }
+        : undefined
     };
   }
 }

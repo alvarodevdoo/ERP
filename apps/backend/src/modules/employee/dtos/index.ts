@@ -118,12 +118,8 @@ export const createTimeEntryDto = z.object({
   breakStart: z.string().datetime('Início do intervalo deve ser uma data válida').optional(),
   breakEnd: z.string().datetime('Fim do intervalo deve ser uma data válida').optional(),
   notes: z.string().max(500, 'Observações devem ter no máximo 500 caracteres').optional(),
-  type: z.enum(['REGULAR', 'OVERTIME', 'HOLIDAY', 'SICK_LEAVE', 'VACATION'], {
-    errorMap: () => ({ message: 'Tipo deve ser REGULAR, OVERTIME, HOLIDAY, SICK_LEAVE ou VACATION' })
-  }).default('REGULAR'),
-  status: z.enum(['PENDING', 'APPROVED', 'REJECTED'], {
-    errorMap: () => ({ message: 'Status deve ser PENDING, APPROVED ou REJECTED' })
-  }).default('PENDING')
+  type: z.enum(['REGULAR', 'OVERTIME', 'HOLIDAY', 'SICK_LEAVE', 'VACATION']).default('REGULAR'),
+  status: z.enum(['PENDING', 'APPROVED', 'REJECTED']).default('PENDING')
 });
 
 /**
@@ -206,9 +202,7 @@ export const createPayrollDto = z.object({
   fgts: z.number().min(0, 'FGTS deve ser maior ou igual a 0').default(0),
   vacationDays: z.number().int().min(0).max(30).default(0),
   sickDays: z.number().int().min(0).max(30).default(0),
-  status: z.enum(['DRAFT', 'CALCULATED', 'APPROVED', 'PAID'], {
-    errorMap: () => ({ message: 'Status deve ser DRAFT, CALCULATED, APPROVED ou PAID' })
-  }).default('DRAFT'),
+  status: z.enum(['DRAFT', 'CALCULATED', 'APPROVED', 'PAID']).default('DRAFT'),
   paymentDate: z.string().datetime().optional(),
   notes: z.string().max(1000, 'Observações devem ter no máximo 1000 caracteres').optional()
 });

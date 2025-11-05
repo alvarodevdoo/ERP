@@ -15,7 +15,6 @@
     "outDir": "./dist",
     "rootDir": "./",
     "removeComments": false,
-    "noEmit": true,
     "composite": true,
     "strict": true,
     "noImplicitAny": true,
@@ -29,6 +28,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "skipLibCheck": true,
+    "noEmit": true,
     "forceConsistentCasingInFileNames": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
@@ -41,7 +41,8 @@
     }
   },
   "include": [
-    "packages/**/*"
+    "packages/**/*",
+    "apps/**/*"
   ],
   "exclude": [
     "node_modules",
@@ -55,16 +56,13 @@
   ],
   "references": [
     {
+      "path": "./apps/backend"
+    },
+    {
       "path": "./packages/shared"
     },
     {
       "path": "./packages/types"
-    },
-    {
-      "path": "./apps/backend"
-    },
-    {
-      "path": "./apps/frontend"
     }
   ]
 }

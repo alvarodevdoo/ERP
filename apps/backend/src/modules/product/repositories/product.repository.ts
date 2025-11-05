@@ -21,14 +21,13 @@ export class ProductRepository {
    */
   async create(data: CreateProductDto, companyId: string): Promise<ProductResponseDto> {
     try {
-      const { variations, dimensions, ...productData } = data;
+      const { variations, ...productData } = data;
 
       const product = await this.prisma.product.create({
         data: {
           ...productData,
           companyId,
-          dimensions: dimensions ? JSON.stringify(dimensions) : null,
-          variations: variations ? {
+          variants: variations ? {
             create: variations.map(variation => ({
               ...variation,
               companyId,
@@ -44,7 +43,7 @@ export class ProductRepository {
               description: true
             }
           },
-          variations: true
+          variants: true
         }
       });
 
@@ -78,7 +77,7 @@ export class ProductRepository {
               description: true
             }
           },
-          variations: {
+          variants: {
             where: {
               deletedAt: null
             }
@@ -133,9 +132,10 @@ export class ProductRepository {
         ...(maxPrice !== undefined && { salePrice: { lte: maxPrice } }),
         ...(inStock !== undefined && inStock && { currentStock: { gt: 0 } }),
         ...(lowStock !== undefined && lowStock && {
-          currentStock: {
-            lte: this.prisma.product.fields.minStock
-          }
+          OR: [
+            { currentStock: { lte: 10 } }, // fallback para produtos com estoque baixo
+            { currentStock: { lte: this.prisma.product.fields.minStock } }
+          ]
         }),
         ...(tags && tags.length > 0 && {
           tags: {
@@ -155,7 +155,7 @@ export class ProductRepository {
                 description: true
               }
             },
-            variations: {
+            variants: {
               where: {
                 deletedAt: null
               }
@@ -189,8 +189,7 @@ export class ProductRepository {
    */
   async update(id: string, data: UpdateProductDto, companyId: string): Promise<ProductResponseDto> {
     try {
-      const { variations: _variations, dimensions, ...productData } = data;
-      // _variations não é usado neste método, apenas extraído para não ser incluído em productData
+      const { dimensions, ...productData } = data;
 
       const product = await this.prisma.product.update({
         where: {
@@ -200,7 +199,9 @@ export class ProductRepository {
         },
         data: {
           ...productData,
-          dimensions: dimensions ? JSON.stringify(dimensions) : undefined,
+          length: dimensions?.length,
+          width: dimensions?.width,
+          height: dimensions?.height,
           updatedAt: new Date()
         },
         include: {
@@ -211,7 +212,7 @@ export class ProductRepository {
               description: true
             }
           },
-          variations: {
+          variants: {
             where: {
               deletedAt: null
             }
@@ -282,7 +283,7 @@ export class ProductRepository {
               description: true
             }
           },
-          variations: {
+          variants: {
             where: {
               deletedAt: null
             }
@@ -341,7 +342,7 @@ export class ProductRepository {
               description: true
             }
           },
-          variations: {
+          variants: {
             where: {
               deletedAt: null
             }
@@ -369,9 +370,10 @@ export class ProductRepository {
           deletedAt: null,
           isActive: true,
           isService: false,
-          currentStock: {
-            lte: this.prisma.product.fields.minStock
-          }
+          OR: [
+            { currentStock: { lte: 10 } }, // produtos com estoque <= 10
+            { minStock: { gte: this.prisma.product.fields.currentStock } } // ou onde minStock >= currentStock
+          ]
         },
         include: {
           category: {
@@ -381,7 +383,7 @@ export class ProductRepository {
               description: true
             }
           },
-          variations: {
+          variants: {
             where: {
               deletedAt: null
             }
@@ -419,7 +421,7 @@ export class ProductRepository {
               description: true
             }
           },
-          variations: {
+          variants: {
             where: {
               deletedAt: null
             }
@@ -493,7 +495,7 @@ export class ProductRepository {
                 description: true
               }
             },
-            variations: {
+            variants: {
               where: {
                 deletedAt: null
               }
@@ -586,11 +588,11 @@ export class ProductRepository {
         lowStockProducts: Array.isArray(lowStockCount) ? lowStockCount[0]?.count || 0 : 0,
         outOfStockProducts: outOfStockCount,
         totalStockValue,
-        averagePrice: stats._avg.salePrice || 0,
+        averagePrice: stats._avg.salePrice ? Number(stats._avg.salePrice) : 0,
         topCategories: topCategories.map(category => ({
           categoryId: category.id,
           categoryName: category.name,
-          productCount: category._count.products
+          productCount: category._count.products || 0
         })),
         recentlyAdded: recentlyAdded.map(product => this.formatProductResponse(product))
       };
@@ -644,7 +646,7 @@ export class ProductRepository {
               description: true
             }
           },
-          variations: {
+          variants: {
             where: {
               deletedAt: null
             }
@@ -681,12 +683,14 @@ export class ProductRepository {
       currentStock: number;
       location?: string;
       weight?: number;
-      dimensions?: string;
+      length?: number;
+      width?: number;
+      height?: number;
       images?: string[];
       isActive: boolean;
       isService: boolean;
       hasVariations: boolean;
-      variations?: Array<{
+      variants?: Array<{
         id: string;
         name: string;
         sku: string;
@@ -706,12 +710,14 @@ export class ProductRepository {
     return {
       id: prod.id,
       name: prod.name,
-      description: prod.description,
+      description: prod.description ?? '',
       sku: prod.sku,
       barcode: prod.barcode,
       categoryId: prod.categoryId,
       category: prod.category,
       unitOfMeasure: prod.unitOfMeasure,
+      unit: prod.unitOfMeasure,
+      trackStock: (prod as any).trackStock ?? true,
       costPrice: prod.costPrice,
       salePrice: prod.salePrice,
       minStock: prod.minStock,
@@ -719,12 +725,19 @@ export class ProductRepository {
       currentStock: prod.currentStock,
       location: prod.location,
       weight: prod.weight,
-      dimensions: prod.dimensions ? JSON.parse(prod.dimensions) : null,
+      dimensions: {
+        length: prod.length ?? null,
+        width: prod.width ?? null,
+        height: prod.height ?? null
+      },
+      length: prod.length ?? null,
+      width: prod.width ?? null,
+      height: prod.height ?? null,
       images: prod.images || [],
       isActive: prod.isActive,
       isService: prod.isService,
       hasVariations: prod.hasVariations,
-      variations: prod.variations?.map((variation) => ({
+      variations: prod.variants?.map((variation) => ({
         id: variation.id,
         name: variation.name,
         sku: variation.sku,
