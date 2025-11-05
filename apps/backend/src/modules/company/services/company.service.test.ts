@@ -3,18 +3,18 @@ import { CompanyService } from './company.service';
 import { CompanyRepository } from '../repositories';
 import { AppError } from '../../../shared/errors/AppError';
 
-// Mock do repositório
+// Mock do repositório como classe para suportar 'new'
 vi.mock('../repositories', () => ({
-  CompanyRepository: vi.fn(() => ({
-    findAll: vi.fn(),
-    findMany: vi.fn(),
-    findById: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    documentExists: vi.fn(),
-    emailExists: vi.fn(),
-  }))
+  CompanyRepository: class CompanyRepository {
+    findAll = vi.fn();
+    findMany = vi.fn();
+    findById = vi.fn();
+    create = vi.fn();
+    update = vi.fn();
+    delete = vi.fn();
+    documentExists = vi.fn();
+    emailExists = vi.fn();
+  }
 }));
 
 describe('CompanyService', () => {
@@ -74,7 +74,7 @@ describe('CompanyService', () => {
     it('deve criar uma nova empresa', async () => {
       const companyData = { 
         name: 'Nova Empresa', 
-        document: '19131243000197',
+        cnpj: '19131243000197',
         email: 'nova@example.com',
         phone: '11999999999',
         address: {
@@ -92,7 +92,7 @@ describe('CompanyService', () => {
       const mockCreatedCompany = { 
         id: '3',
         name: companyData.name,
-        cnpj: companyData.document,
+        cnpj: companyData.cnpj,
         email: companyData.email,
         phone: companyData.phone,
         address: companyData.address,

@@ -1,12 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
 import { FinancialService } from '../../financial/services/financial.service';
 import { createMockPrisma } from '../../../test-utils/prismaMock';
-import { mockRoleServiceFactory } from '../../../test-utils/roleServiceMock';
+// Não usar fábrica externa para evitar erro de import antes da inicialização
 
 // usar prisma mock compartilhado
 
-// Monkey-patch RoleService com fábrica compartilhada
-vi.mock('../../role/services', mockRoleServiceFactory(true));
+// Monkey-patch RoleService inline para evitar hoisting issues
+vi.mock('../../role/services', () => ({
+  RoleService: class {
+    constructor(_prisma: any) {}
+    async checkPermission() {
+      return true;
+    }
+  }
+}));
 
 describe('FinancialService basic flow', () => {
   it('createTransaction should create and optionally create installments', async () => {

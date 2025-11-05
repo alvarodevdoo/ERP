@@ -33,16 +33,16 @@ vi.mock('jsonwebtoken', () => {
   };
 });
 
-// Mock do AuthRepository
+// Mock do AuthRepository como classe para suportar 'new'
 vi.mock('../repositories/auth.repository', () => {
-  const AuthRepository = vi.fn(() => ({
-    findUserByEmail: vi.fn(),
-    findUserById: vi.fn(),
-    createUserWithCompany: vi.fn(),
-    updateUser: vi.fn(),
-    emailExists: vi.fn(),
-    companyCnpjExists: vi.fn(),
-  }));
+  class AuthRepository {
+    findUserByEmail = vi.fn();
+    findUserById = vi.fn();
+    createUserWithCompany = vi.fn();
+    updateUser = vi.fn();
+    emailExists = vi.fn();
+    companyCnpjExists = vi.fn();
+  }
   return { AuthRepository };
 });
 

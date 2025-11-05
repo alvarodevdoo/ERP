@@ -5,30 +5,31 @@ import { ProductRepository, ProductCategoryRepository, StockMovementRepository }
 
 // Mock dos repositórios (instâncias únicas para sincronizar com o serviço)
 vi.mock('../repositories', () => {
-  const productRepoMock = {
-    findAll: vi.fn(),
-    findMany: vi.fn(),
-    findById: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    findByCategory: vi.fn(),
-    restore: vi.fn(),
-    formatProductResponse: vi.fn((product: any) => product),
-    skuExists: vi.fn().mockResolvedValue(false)
-  };
-
-  const categoryRepoMock = {
-    findById: vi.fn().mockResolvedValue({ id: 'cat-123', isActive: true })
-  } as any;
-  const stockMovementRepoMock = {
-    create: vi.fn()
-  } as any;
-
+  class ProductRepositoryMock {
+    findAll = vi.fn();
+    findMany = vi.fn();
+    findById = vi.fn();
+    create = vi.fn();
+    update = vi.fn();
+    delete = vi.fn();
+    findByCategory = vi.fn();
+    restore = vi.fn();
+    formatProductResponse = vi.fn((product: any) => product);
+    skuExists = vi.fn().mockResolvedValue(false);
+    constructor(_prisma?: any) {}
+  }
+  class ProductCategoryRepositoryMock {
+    findById = vi.fn().mockResolvedValue({ id: 'cat-123', isActive: true });
+    constructor(_prisma?: any) {}
+  }
+  class StockMovementRepositoryMock {
+    create = vi.fn();
+    constructor(_prisma?: any) {}
+  }
   return {
-    ProductRepository: vi.fn(() => productRepoMock),
-    ProductCategoryRepository: vi.fn(() => categoryRepoMock),
-    StockMovementRepository: vi.fn(() => stockMovementRepoMock)
+    ProductRepository: ProductRepositoryMock,
+    ProductCategoryRepository: ProductCategoryRepositoryMock,
+    StockMovementRepository: StockMovementRepositoryMock,
   };
 });
 
@@ -56,6 +57,11 @@ describe('ProductService', () => {
     // Criar instância do serviço com os repositórios mockados
     productService = new ProductService(prisma);
     
+    // Direcionar o serviço para usar as instâncias mockadas
+    (productService as any).productRepository = productRepository;
+    (productService as any).categoryRepository = categoryRepository;
+    (productService as any).stockMovementRepository = stockMovementRepository;
+
     // Mock do método de validação de permissão
     (productService as any).validatePermission = vi.fn().mockResolvedValue(true);
   });
@@ -132,6 +138,9 @@ describe('ProductService', () => {
     
     // Mock para o método validatePermission
     vi.spyOn(productService as any, 'validatePermission').mockResolvedValue(true);
+
+    // Garantir que o produto existe antes da exclusão
+    (productRepository.findById as any).mockResolvedValue({ id: productId, name: 'Produto 1' });
 
     await productService.delete(productId, companyId, userId);
     

@@ -5,25 +5,27 @@ import { RoleService } from '../../role/services';
 import { AppError } from '../../../shared/errors/AppError';
 
 // Mock dos repositórios
-vi.mock('../repositories', () => ({
-  EmployeeRepository: vi.fn(() => ({
-    findAll: vi.fn(),
-    findMany: vi.fn(),
-    findById: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    cpfExists: vi.fn(),
-    emailExists: vi.fn(),
-  }))
-}));
+vi.mock('../repositories', () => {
+  class EmployeeRepositoryMock {
+    findAll = vi.fn();
+    findMany = vi.fn();
+    findById = vi.fn();
+    create = vi.fn();
+    update = vi.fn();
+    delete = vi.fn();
+    cpfExists = vi.fn();
+    emailExists = vi.fn();
+  }
+  return { EmployeeRepository: EmployeeRepositoryMock };
+});
 
-vi.mock('../../role/services', () => ({
-  RoleService: vi.fn(() => ({
-    validatePermission: vi.fn().mockResolvedValue(true),
-    checkPermission: vi.fn().mockResolvedValue(true),
-  }))
-}));
+vi.mock('../../role/services', () => {
+  class RoleServiceMock {
+    validatePermission = vi.fn().mockResolvedValue(true);
+    checkPermission = vi.fn().mockResolvedValue(true);
+  }
+  return { RoleService: RoleServiceMock };
+});
 
 describe('EmployeeService', () => {
   let employeeService: EmployeeService;
