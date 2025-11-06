@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import { AuthService } from './auth.service';
 import { AppError } from '../../../shared/errors/AppError';
@@ -86,8 +86,8 @@ describe('AuthService', () => {
         employee: null,
       };
       
-      (authRepository.findUserByEmail as vi.Mock).mockResolvedValue(mockUser);
-      (prisma.refreshToken.create as vi.Mock).mockResolvedValue({ token: 'refresh_token' });
+      (authRepository.findUserByEmail as Mock).mockResolvedValue(mockUser);
+      (prisma.refreshToken.create as Mock).mockResolvedValue({ token: 'refresh_token' });
       
       const result = await authService.login({
         email: 'test@example.com',
@@ -102,7 +102,7 @@ describe('AuthService', () => {
     });
     
     it('deve lançar erro para usuário não encontrado', async () => {
-      (authRepository.findUserByEmail as vi.Mock).mockResolvedValue(null);
+      (authRepository.findUserByEmail as Mock).mockResolvedValue(null);
       
       await expect(authService.login({
         email: 'nonexistent@example.com',
@@ -113,14 +113,14 @@ describe('AuthService', () => {
 
   describe('refreshToken', () => {
     it('deve gerar novo token de acesso com refresh token válido', async () => {
-      (prisma.refreshToken.findUnique as vi.Mock).mockResolvedValue({
+      (prisma.refreshToken.findUnique as Mock).mockResolvedValue({
         id: 'token-123',
         token: 'valid_refresh_token',
         userId: 'user-123',
         expiresAt: new Date(Date.now() + 1000 * 60 * 60)
       });
       
-      (authRepository.findUserById as vi.Mock).mockResolvedValue({
+      (authRepository.findUserById as Mock).mockResolvedValue({
         id: 'user-123',
         email: 'test@example.com',
         name: 'Test User',
@@ -138,8 +138,8 @@ describe('AuthService', () => {
 
   describe('register', () => {
     it('deve registrar um novo usuário', async () => {
-      (authRepository.emailExists as vi.Mock).mockResolvedValue(false);
-      (authRepository.companyCnpjExists as vi.Mock).mockResolvedValue(false);
+      (authRepository.emailExists as Mock).mockResolvedValue(false);
+      (authRepository.companyCnpjExists as Mock).mockResolvedValue(false);
       
       const mockCreatedUser = {
         id: 'new-user-123',
@@ -151,11 +151,12 @@ describe('AuthService', () => {
         employee: null,
       };
       
-      (authRepository.createUserWithCompany as vi.Mock).mockResolvedValue(mockCreatedUser);
+      (authRepository.createUserWithCompany as Mock).mockResolvedValue(mockCreatedUser);
       
       const result = await authService.register({
         email: 'new@example.com',
         password: 'password123',
+        confirmPassword: 'password123',
         name: 'New User',
         companyName: 'New Company',
         companyDocument: '12345678901234',
@@ -169,11 +170,12 @@ describe('AuthService', () => {
     });
     
     it('deve lançar erro para email já existente', async () => {
-      (authRepository.emailExists as vi.Mock).mockResolvedValue(true);
+      (authRepository.emailExists as Mock).mockResolvedValue(true);
       
       await expect(authService.register({
         email: 'existing@example.com',
         password: 'password123',
+        confirmPassword: 'password123',
         name: 'Existing User',
         companyName: 'Existing Company',
         companyDocument: '12345678901234',

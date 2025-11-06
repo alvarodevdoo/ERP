@@ -21,20 +21,22 @@ import {
 } from '../dtos';
 
 // Tipo para transação com includes do Prisma
-type TransactionWithIncludes = Prisma.FinancialEntryGetPayload<{
+const transactionWithIncludes = {
   include: {
-    company: true;
-    partner: true;
-    order: true;
+    company: true,
+    partner: true,
+    order: true,
     user: {
       select: {
-        id: true;
-        name: true;
-        email: true;
-      };
-    };
-  };
-}>;
+        id: true,
+        name: true,
+        email: true,
+      },
+    },
+  },
+};
+
+type TransactionWithIncludes = Prisma.FinancialEntryGetPayload<typeof transactionWithIncludes>;
 
 export class FinancialRepository {
   constructor(private prisma: PrismaClient) {}

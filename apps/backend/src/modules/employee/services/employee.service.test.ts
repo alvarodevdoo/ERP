@@ -37,7 +37,7 @@ describe('EmployeeService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     employeeRepository = new EmployeeRepository();
-    roleService = new RoleService();
+    roleService = new RoleService({} as any);
     // Injeta os mocks no serviço para que ele use estas instâncias
     employeeService = new EmployeeService(employeeRepository as any, roleService as any);
   });
@@ -128,14 +128,19 @@ describe('EmployeeService', () => {
   describe('create', () => {
     it('deve criar um novo funcionário', async () => {
       const employeeData = { 
-        name: 'Novo Funcionário', 
-        email: 'novo@example.com',
-        cpf: '52998224725',
-        position: 'Analista',
+        // CAMPOS OBRIGATÓRIOS DO DTO AGORA ESTÃO AQUI:
+        userId: 'user-to-create-emp', // <<< NOVO
+        companyId: companyId, // <<< NOVO (Ou use o companyId da chamada, dependendo da sua arquitetura)
+        roleId: 'role-default-id', // <<< NOVO
+
+        // CAMPOS OPCIONAIS DO DTO:
         department: 'TI',
+        position: 'Analista',
         salary: 5000,
-        birthDate: '1990-01-01',
-        hireDate: '2020-01-01'
+
+        // Formato de data corrigido para z.string().datetime()
+        hireDate: '2020-01-01T10:00:00.000Z', 
+        isActive: true
       };
       
       employeeRepository.cpfExists.mockResolvedValue(false);

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import { ProductService } from './product.service';
 import { ProductRepository, ProductCategoryRepository, StockMovementRepository } from '../repositories';
+import { CreateProductDto } from '../dtos';
 
 // Mock dos repositórios (instâncias únicas para sincronizar com o serviço)
 vi.mock('../repositories', () => {
@@ -80,7 +81,16 @@ describe('ProductService', () => {
       totalPages: 1,
     });
 
-    const result = await productService.findMany({}, companyId, userId);
+    const result = await productService.findMany({
+      page: 1,
+      limit: 10,
+      sortBy: 'name',
+      sortOrder: 'asc',
+      search: 'Produto',
+      categoryId: 'cat-123',
+      inStock: true,
+      tags: ['tag1', 'tag2'],
+    }, companyId, userId);
     
     expect(productRepository.findMany).toHaveBeenCalled();
     expect(result.products.length).toBeGreaterThanOrEqual(0);
@@ -97,15 +107,22 @@ describe('ProductService', () => {
   });
 
   it('deve criar um novo produto', async () => {
-    const productData = { 
-      name: 'Novo Produto', 
-      sku: 'SKU123', 
-      categoryId: 'cat-123',
-      unitOfMeasure: 'un',
+    const productData: CreateProductDto = {
+      name: 'Novo Produto',
+      sku: 'SKU123',
+      categoryId: '550e8400-e29b-41d4-a716-446655440000',
+      unit: 'un',
       costPrice: 100,
       salePrice: 150,
-      minStock: 10
+      minStock: 10,
+      trackStock: true,
+      isActive: true,
+      isService: false,
+      hasVariations: false,
+      currentStock: 0
     };
+
+
     const mockCreatedProduct = { id: '3', ...productData };
     
     (productRepository.create as any).mockResolvedValue(mockCreatedProduct);
@@ -134,7 +151,7 @@ describe('ProductService', () => {
     const userId = '1';
     
     // Mock para o método canDeleteProduct
-    vi.spyOn(productService, 'canDeleteProduct').mockResolvedValue({ canDelete: true });
+    vi.spyOn(productService as any, 'canDeleteProduct').mockResolvedValue({ canDelete: true });
     
     // Mock para o método validatePermission
     vi.spyOn(productService as any, 'validatePermission').mockResolvedValue(true);

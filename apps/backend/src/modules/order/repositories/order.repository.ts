@@ -25,8 +25,7 @@ function mapDTOStatusToPrisma(status: 'PENDING' | 'IN_PROGRESS' | 'PAUSED' | 'CO
   return reverseStatusMap[status];
 }
 
-// Define a type for the order object returned by Prisma
-const orderWithIncludes = Prisma.validator<Prisma.OrderFindManyArgs>()({
+const orderWithIncludes = {
   include: {
     partner: {
       select: {
@@ -69,10 +68,9 @@ const orderWithIncludes = Prisma.validator<Prisma.OrderFindManyArgs>()({
     },
     expenses: true,
   },
-});
+};
 
-// Modificando o tipo para aceitar objetos parciais retornados pelo Prisma
-type PrismaOrder = Partial<Prisma.OrderGetPayload<typeof orderWithIncludes>>;
+type PrismaOrder = Prisma.OrderGetPayload<typeof orderWithIncludes>;
 import { 
   CreateOrderDTO, 
   UpdateOrderDTO, 
@@ -137,7 +135,7 @@ export class OrderRepository {
           partner: { connect: { id: data.partnerId } },
           title: data.title,
           description: data.description,
-          status: $Enums.OrderStatus.PENDING,
+          status: 'PENDING',
           priority: data.priority,
           expectedStartDate: data.expectedStartDate ? new Date(data.expectedStartDate) : null,
           expectedEndDate: data.expectedEndDate ? new Date(data.expectedEndDate) : null,
@@ -145,19 +143,19 @@ export class OrderRepository {
           actualEndDate: data.actualEndDate ? new Date(data.actualEndDate) : null,
           paymentTerms: data.paymentTerms,
           notes: data.observations, // Mapeado
-          subtotal: new Prisma.Decimal(String(subtotal)),
-          discount: new Prisma.Decimal(String(data.discount)),
+          subtotal: subtotal,
+          discount: data.discount,
           discountType: data.discountType,
-          totalValue: new Prisma.Decimal(String(totalValue)),
+          totalValue: totalValue,
           user: { connect: { id: userId } },
           items: {
             create: itemsWithCalculations.map(item => ({
               productId: item.productId,
-              quantity: new Prisma.Decimal(String(item.quantity)),
-              unitPrice: new Prisma.Decimal(String(item.unitPrice)),
-              discount: new Prisma.Decimal(String(item.discount)),
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              discount: item.discount,
               discountType: item.discountType,
-              total: new Prisma.Decimal(String(item.total)),
+              total: item.total,
               description: item.observations ?? '', // Mapeado (string obrigatória)
               company: { connect: { id: companyId } },
             }))
@@ -254,8 +252,8 @@ export class OrderRepository {
 
       if (filters.minValue !== undefined || filters.maxValue !== undefined) {
         where.totalValue = {
-          ...(filters.minValue !== undefined && { gte: new Prisma.Decimal(String(filters.minValue)) }),
-          ...(filters.maxValue !== undefined && { lte: new Prisma.Decimal(String(filters.maxValue)) }),
+          ...(filters.minValue !== undefined && { gte: filters.minValue }),
+          ...(filters.maxValue !== undefined && { lte: filters.maxValue }),
         };
       }
 
@@ -264,7 +262,7 @@ export class OrderRepository {
           where,
           include: orderWithIncludes.include,
           orderBy: {
-            [filters.sortBy]: filters.sortOrder as Prisma.SortOrder
+            [filters.sortBy]: filters.sortOrder
           },
           skip: (filters.page - 1) * filters.limit,
           take: filters.limit
@@ -306,7 +304,7 @@ export class OrderRepository {
       }
 
       // Verificar se pode ser editada
-      if (existingOrder.status === $Enums.OrderStatus.DELIVERED || existingOrder.status === $Enums.OrderStatus.CANCELLED) {
+      if (existingOrder.status === 'DELIVERED' || existingOrder.status === 'CANCELLED') {
         throw new AppError('Não é possível editar uma ordem finalizada ou cancelada', 400);
       }
 
@@ -321,7 +319,7 @@ export class OrderRepository {
         ...(data.actualEndDate ? { actualEndDate: new Date(data.actualEndDate) } : {}),
         ...(data.paymentTerms !== undefined ? { paymentTerms: data.paymentTerms } : {}),
         ...(data.observations !== undefined ? { notes: data.observations } : {}),
-        ...(data.discount !== undefined ? { discount: new Prisma.Decimal(String(data.discount)) } : {}),
+        ...(data.discount !== undefined ? { discount: data.discount } : {}),
         ...(data.discountType !== undefined ? { discountType: data.discountType } : {}),
       };
 
@@ -360,15 +358,15 @@ export class OrderRepository {
 
         updateData = {
           ...updateData,
-          totalValue: new Prisma.Decimal(String(totalValue)),
+          totalValue: totalValue,
           items: {
             create: itemsWithCalculations.map(item => ({
               productId: item.productId,
-              quantity: new Prisma.Decimal(String(item.quantity)),
-              unitPrice: new Prisma.Decimal(String(item.unitPrice)),
-              discount: new Prisma.Decimal(String(item.discount)),
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              discount: item.discount,
               discountType: item.discountType,
-              total: new Prisma.Decimal(String(item.total)),
+              total: item.total,
               description: item.observations ?? '',
               company: { connect: { id: companyId } },
             }))
@@ -406,7 +404,7 @@ export class OrderRepository {
         throw new AppError('Ordem de serviço não encontrada', 404);
       }
 
-      if (order.status === ('IN_PRODUCTION' as any)) {
+      if (order.status === 'IN_PRODUCTION' as $Enums.OrderStatus) {
         throw new AppError('Não é possível excluir uma ordem em andamento', 400);
       }
 
@@ -594,7 +592,6 @@ export class OrderRepository {
           companyId,
           deletedAt: null,
           status: { in: [$Enums.OrderStatus.READY, $Enums.OrderStatus.DELIVERED] },
-          actualStartDate: { not: null },
           actualEndDate: { not: null },
         },
         select: { actualStartDate: true, actualEndDate: true },
@@ -602,7 +599,7 @@ export class OrderRepository {
 
       const averageCompletionTime =
         completedOrders.length > 0
-          ? completedOrders.reduce<number>((sum, order) => {
+          ? completedOrders.reduce((sum, order) => {
               const days = Math.ceil(
                 (order.actualEndDate!.getTime() -
                   order.actualStartDate!.getTime()) /
@@ -748,7 +745,7 @@ export class OrderRepository {
           expenses: true
         },
         orderBy: {
-          [filters.sortBy]: filters.sortOrder as Prisma.SortOrder
+          [filters.sortBy]: filters.sortOrder
         }
       });
 
@@ -764,13 +761,13 @@ export class OrderRepository {
         expectedEndDate: order.expectedEndDate?.toISOString(),
         actualStartDate: order.actualStartDate?.toISOString(),
         actualEndDate: order.actualEndDate?.toISOString(),
-        subtotal: order.items.reduce((sum: number, item: any) => sum + (item.quantity.toNumber() * item.unitPrice.toNumber()), 0),
+        subtotal: order.items.reduce((sum: number, item: any) => sum + (item.quantity * item.unitPrice), 0),
         discountValue: (order.discountType === 'PERCENTAGE'
-          ? (order.items.reduce((sum: number, item: any) => sum + (item.quantity.toNumber() * item.unitPrice.toNumber()), 0) * order.discount.toNumber()) / 100
-          : order.discount.toNumber()),
-        totalValue: order.totalValue.toNumber(),
+          ? (order.items.reduce((sum: number, item: any) => sum + (item.quantity * item.unitPrice), 0) * order.discount) / 100
+          : order.discount),
+        totalValue: order.totalValue,
         totalHours: order.timeTracking.reduce((sum: number, t: any) => sum + (t.duration || 0), 0),
-        totalExpenses: order.expenses.reduce((sum: number, e: any) => sum + e.amount.toNumber(), 0),
+        totalExpenses: order.expenses.reduce((sum: number, e: any) => sum + e.amount, 0),
         itemsCount: order.items.length,
         // assignedToName: order.assignedToUser?.name, // Campo não existe no schema atual
         createdAt: order.createdAt.toISOString(),
@@ -806,13 +803,13 @@ export class OrderRepository {
       actualEndDate: order.actualEndDate || undefined,
       paymentTerms: order.paymentTerms || undefined,
       observations: order.notes || undefined, // Mapeado
-      discount: order.discount?.toNumber() || 0,
+      discount: order.discount.toNumber() || 0,
       discountType: order.discountType || 'PERCENTAGE',
-      subtotal: order.items?.reduce((sum: number, item: any) => sum + (item.quantity.toNumber() * item.unitPrice.toNumber()), 0) || 0,
+      subtotal: order.items?.reduce((sum, item) => sum + (item.quantity.toNumber() * item.unitPrice.toNumber()), 0) || 0,
       discountValue: order.discountType === 'PERCENTAGE' && order.items && order.discount
-        ? (order.items.reduce((sum: number, item: any) => sum + (item.quantity.toNumber() * item.unitPrice.toNumber()), 0) * order.discount.toNumber()) / 100
-        : order.discount?.toNumber() || 0,
-      totalValue: order.totalValue?.toNumber() || 0,
+        ? (order.items.reduce((sum, item) => sum + (item.quantity.toNumber() * item.unitPrice.toNumber()), 0) * order.discount.toNumber()) / 100
+        : order.discount.toNumber() || 0,
+      totalValue: order.totalValue.toNumber() || 0,
       // assignedTo: undefined,
       // assignedToName: undefined,
       items: order.items.map((item) => ({
@@ -849,8 +846,8 @@ export class OrderRepository {
         billable: expense.billable,
         createdAt: expense.createdAt,
       })),
-      totalHours: order.timeTracking.reduce((sum: number, t: any) => sum + (t.duration || 0), 0),
-      totalExpenses: order.expenses.reduce((sum: number, e: any) => sum + e.amount.toNumber(), 0),
+      totalHours: order.timeTracking.reduce((sum, t) => sum + (t.duration || 0), 0),
+      totalExpenses: order.expenses.reduce((sum, e) => sum + e.amount.toNumber(), 0),
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
       createdBy: order.userId, // Mapeado

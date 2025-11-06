@@ -14,10 +14,12 @@
     "exactOptionalPropertyTypes": false,
     "noImplicitAny": false,
     "strictNullChecks": false,
-    "strict": false
+    "strict": false,
+    "types": ["node", "vitest"]
   },
   "include": [
-    "src/**/*"
+    "src/**/*", 
+    "tests"
   ],
   "exclude": [
     "dist",

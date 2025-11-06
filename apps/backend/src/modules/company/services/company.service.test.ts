@@ -77,13 +77,11 @@ describe('CompanyService', () => {
         cnpj: '19131243000197',
         email: 'nova@example.com',
         phone: '11999999999',
-        address: {
-          street: 'Rua Teste',
-          number: '123',
-          city: 'São Paulo',
-          state: 'SP',
-          zipCode: '01234567'
-        }
+        address: 'Rua Teste',
+        number: '123',
+        city: 'São Paulo',
+        state: 'SP',
+        zipCode: '01234567'
       };
       
       companyRepository.documentExists.mockResolvedValue(false);
@@ -95,10 +93,10 @@ describe('CompanyService', () => {
         cnpj: companyData.cnpj,
         email: companyData.email,
         phone: companyData.phone,
-        address: companyData.address,
-        city: companyData.address.city,
-        state: companyData.address.state,
-        zipCode: companyData.address.zipCode,
+        address: companyData.address, 
+        city: companyData.city,
+        state: companyData.state,
+        zipCode: companyData.zipCode,
         description: 'Empresa criada para testes',
         website: 'https://empresa.example.com',
         logo: null,
