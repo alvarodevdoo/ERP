@@ -73,8 +73,8 @@ export class StockService {
           data.productId,
           data.locationId!,
           data.quantity,
+          companyId,
           data.unitCost,
-          companyId
         );
         return movement;
       });
@@ -125,8 +125,8 @@ export class StockService {
           data.productId,
           data.locationId!,
           -data.quantity,
+          companyId,
           undefined,
-          companyId
         );
         return movement;
       });
@@ -178,8 +178,8 @@ export class StockService {
           data.productId,
           data.locationId!,
           quantityDifference,
+          companyId,
           undefined,
-          companyId
         );
         return movement;
       });
@@ -240,15 +240,15 @@ export class StockService {
           data.productId,
           data.fromLocationId,
           -data.quantity,
+          companyId,
           undefined,
-          companyId
         );
         await this.stockRepository.updateStockQuantity(
           data.productId,
           data.toLocationId,
           data.quantity,
+          companyId,
           sourceStock.unitCost,
-          companyId
         );
         return movement;
       });
@@ -270,7 +270,7 @@ export class StockService {
   }
 
   
-  async findStockItem(productId: string, locationId: string, userId: string, companyId: string): Promise<StockItemResponseDTO | null> {
+  async findStockItem(productId: string, locationId: string | undefined, userId: string, companyId: string): Promise<StockItemResponseDTO | null> {
     const hasPermission = await this.roleService.checkPermission({ userId, permission: 'read', resource: 'stock' });
     if (!hasPermission) {
       throw new AppError('Usuário não tem permissão para visualizar estoque', 403);

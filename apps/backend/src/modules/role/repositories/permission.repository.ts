@@ -18,8 +18,15 @@ export class PermissionRepository {
     action: string;
     isActive?: boolean;
   }): Promise<Permission> {
+    const { name, description, resource, action, isActive } = data;
     return this.prisma.permission.create({
-      data,
+      data: {
+        name,
+        description: description ?? null,
+        resource,
+        action,
+        ...(isActive !== undefined ? { isActive } : {}),
+      },
     });
   }
 
@@ -102,9 +109,27 @@ export class PermissionRepository {
     action?: string | undefined;
     isActive?: boolean | undefined;
   }): Promise<Permission> {
+    const updateData: Prisma.PermissionUpdateInput = {};
+
+    if (data.name !== undefined) {
+      updateData.name = data.name;
+    }
+    if (data.description !== undefined) {
+      updateData.description = data.description ?? null;
+    }
+    if (data.resource !== undefined) {
+      updateData.resource = data.resource;
+    }
+    if (data.action !== undefined) {
+      updateData.action = data.action;
+    }
+    if (data.isActive !== undefined) {
+      updateData.isActive = data.isActive;
+    }
+
     return this.prisma.permission.update({
       where: { id },
-      data,
+      data: updateData,
     });
   }
 

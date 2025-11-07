@@ -46,11 +46,11 @@ export class QuoteService {
     const createInput: Prisma.QuoteCreateInput = {
       number: nextNumber,
       title: normalizedData.title,
-      description: normalizedData.description,
+      description: normalizedData.description ?? null,
       validUntil: new Date(normalizedData.validUntil),
-      paymentTerms: normalizedData.paymentTerms,
-      deliveryTerms: normalizedData.deliveryTerms,
-      notes: normalizedData.observations,
+      paymentTerms: normalizedData.paymentTerms ?? null,
+      deliveryTerms: normalizedData.deliveryTerms ?? null,
+      notes: normalizedData.observations ?? null,
       status: 'DRAFT',
       discount: new Prisma.Decimal(normalizedData.discount),
       discountType: normalizedData.discountType,
@@ -116,12 +116,13 @@ export class QuoteService {
     };
     const { itemsWithTotals, subtotal, totalValue } = this._calculateQuoteTotals(itemsToUpdate, discountToUpdate);
     const updateInput: Prisma.QuoteUpdateInput = {
-      title: normalizedData.title,
-      description: normalizedData.description,
-      validUntil: normalizedData.validUntil ? new Date(normalizedData.validUntil) : undefined,
-      paymentTerms: normalizedData.paymentTerms,
-      deliveryTerms: normalizedData.deliveryTerms,
-      notes: normalizedData.observations,
+      // adicionar somente campos definidos para evitar undefined
+      ...(normalizedData.title !== undefined && { title: normalizedData.title }),
+      ...(normalizedData.description !== undefined && { description: normalizedData.description ?? null }),
+      ...(normalizedData.validUntil !== undefined && { validUntil: new Date(normalizedData.validUntil) }),
+      ...(normalizedData.paymentTerms !== undefined && { paymentTerms: normalizedData.paymentTerms ?? null }),
+      ...(normalizedData.deliveryTerms !== undefined && { deliveryTerms: normalizedData.deliveryTerms ?? null }),
+      ...(normalizedData.observations !== undefined && { notes: normalizedData.observations ?? null }),
       discount: new Prisma.Decimal(discountToUpdate.discount),
       discountType: discountToUpdate.discountType,
       subtotal: new Prisma.Decimal(subtotal),
@@ -207,11 +208,11 @@ export class QuoteService {
     const createInput: Prisma.QuoteCreateInput = {
       number: nextNumber,
       title: data.title || `${originalQuote.title} (Cópia)`,
-      description: originalQuote.description,
+      description: originalQuote.description ?? null,
       validUntil: data.validUntil ? new Date(data.validUntil) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      paymentTerms: originalQuote.paymentTerms,
-      deliveryTerms: originalQuote.deliveryTerms,
-      notes: originalQuote.observations,
+      paymentTerms: originalQuote.paymentTerms ?? null,
+      deliveryTerms: originalQuote.deliveryTerms ?? null,
+      notes: originalQuote.observations ?? null,
       status: 'DRAFT',
       discount: new Prisma.Decimal(originalQuote.discount),
       discountType: originalQuote.discountType,
@@ -275,9 +276,9 @@ export class QuoteService {
           data: {
             number: nextNumber,
             title: quote.title,
-            description: quote.description,
-            paymentTerms: quote.paymentTerms,
-            notes: quote.observations,
+            description: quote.description ?? null,
+            paymentTerms: quote.paymentTerms ?? null,
+            notes: quote.observations ?? null,
             status: 'PENDING',
             discount: new Prisma.Decimal(quote.discount),
             subtotal: new Prisma.Decimal(quote.subtotal),
@@ -396,6 +397,8 @@ export class QuoteService {
     }
   }
 
+  private normalizeQuoteData(data: CreateQuoteDTO): CreateQuoteDTO;
+  private normalizeQuoteData(data: UpdateQuoteDTO): UpdateQuoteDTO;
   private normalizeQuoteData(data: CreateQuoteDTO | UpdateQuoteDTO): CreateQuoteDTO | UpdateQuoteDTO {
     const normalized = { ...data };
     if (normalized.title) {
@@ -454,8 +457,15 @@ export class QuoteService {
     if (!lastNumber) {
       return 'OS-000001';
     }
-    const numberPart = lastNumber.split('-')[1];
-    const nextNumber = (parseInt(numberPart) + 1).toString().padStart(6, '0');
+    const parts = lastNumber.split('-');
+    if (parts.length !== 2) {
+      return 'OS-000001';
+    }
+    const parsed = parseInt(parts[1] ?? '0', 10);
+    if (isNaN(parsed)) {
+      return 'OS-000001';
+    }
+    const nextNumber = (parsed + 1).toString().padStart(6, '0');
     return `OS-${nextNumber}`;
   }
 
@@ -531,7 +541,7 @@ export class QuoteService {
       return 'ORC-000001';
     }
 
-    const numberPart = parseInt(parts[1], 10);
+    const numberPart = parseInt(parts[1] ?? '0', 10);
     if (isNaN(numberPart)) {
       return 'ORC-000001';
     }

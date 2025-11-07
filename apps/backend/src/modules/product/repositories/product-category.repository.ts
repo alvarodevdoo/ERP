@@ -18,10 +18,13 @@ export class ProductCategoryRepository {
    */
   async create(data: CreateProductCategoryDto, companyId: string): Promise<ProductCategoryResponseDto> {
     try {
-      // 
+      // Normalizar campos opcionais para evitar undefined com exactOptionalPropertyTypes
+      const { description, parentId, ...rest } = data;
       const category = await this.prisma.productCategory.create({
         data: {
-          ...data,
+          ...rest,
+          description: description ?? null,
+          parentId: parentId ?? null,
           companyId
         },
         include: {
@@ -323,17 +326,33 @@ export class ProductCategoryRepository {
         }
       }
 
-      // 
+      // Construir payload de atualização evitando undefined e normalizando campos anuláveis
+      const updateData: Prisma.ProductCategoryUncheckedUpdateInput = {
+        updatedAt: new Date()
+      };
+      if (data.name !== undefined) {
+        updateData.name = data.name;
+      }
+      if (data.description !== undefined) {
+        updateData.description = data.description ?? null;
+      }
+      if (data.parentId !== undefined) {
+        updateData.parentId = data.parentId ?? null;
+      }
+      if (data.isActive !== undefined) {
+        updateData.isActive = data.isActive;
+      }
+      if (data.sortOrder !== undefined) {
+        updateData.sortOrder = data.sortOrder;
+      }
+
       const category = await this.prisma.productCategory.update({
         where: {
           id,
           companyId,
           deletedAt: null
         },
-        data: {
-          ...data,
-          updatedAt: new Date()
-        },
+        data: updateData,
         include: {
           parent: {
             select: {
@@ -563,9 +582,9 @@ export class ProductCategoryRepository {
   /**
    * Verificar referência circular
    */
-  private async checkCircularReference(categoryId: string, parentId: string, companyId: string): Promise<boolean> {
+  private async checkCircularReference(categoryId: string, parentId: string | null, companyId: string): Promise<boolean> {
     try {
-      let currentParentId = parentId;
+      let currentParentId: string | null = parentId;
       const visited = new Set<string>();
 
       while (currentParentId) {
@@ -591,7 +610,7 @@ export class ProductCategoryRepository {
           }
         });
 
-        currentParentId = parent?.parentId || null;
+        currentParentId = parent?.parentId ?? null;
       }
 
       return false;
@@ -607,8 +626,8 @@ export class ProductCategoryRepository {
     const cat = category as {
       id: string;
       name: string;
-      description?: string;
-      parentId?: string;
+      description?: string | null;
+      parentId?: string | null;
       parent?: { id: string; name: string };
       children?: Array<{
         id: string;
@@ -621,14 +640,14 @@ export class ProductCategoryRepository {
       companyId: string;
       createdAt: Date;
       updatedAt: Date;
-      deletedAt?: Date;
+      deletedAt?: Date | null;
     };
     
     return {
       id: cat.id,
       name: cat.name,
-      description: cat.description,
-      parentId: cat.parentId,
+      description: cat.description ?? null,
+      parentId: cat.parentId ?? null,
       parent: cat.parent,
       children: cat.children?.map((child) => ({
         id: child.id,
@@ -641,7 +660,7 @@ export class ProductCategoryRepository {
       companyId: cat.companyId,
       createdAt: cat.createdAt,
       updatedAt: cat.updatedAt,
-      deletedAt: cat.deletedAt
+      deletedAt: cat.deletedAt ?? null
     };
   }
 }

@@ -134,15 +134,15 @@ export class OrderRepository {
           ...(data.quoteId ? { quote: { connect: { id: data.quoteId } } } : {}),
           partner: { connect: { id: data.partnerId } },
           title: data.title,
-          description: data.description,
+          description: data.description ?? null,
           status: 'PENDING',
           priority: data.priority,
           expectedStartDate: data.expectedStartDate ? new Date(data.expectedStartDate) : null,
           expectedEndDate: data.expectedEndDate ? new Date(data.expectedEndDate) : null,
           actualStartDate: data.actualStartDate ? new Date(data.actualStartDate) : null,
           actualEndDate: data.actualEndDate ? new Date(data.actualEndDate) : null,
-          paymentTerms: data.paymentTerms,
-          notes: data.observations, // Mapeado
+          paymentTerms: data.paymentTerms ?? null,
+          notes: data.observations ?? null, // Mapeado
           subtotal: subtotal,
           discount: data.discount,
           discountType: data.discountType,
@@ -470,24 +470,37 @@ export class OrderRepository {
       }
 
       // Validar transição de status
-      const validTransitions: Record<string, string[]> = {
-        'PENDING': ['CONFIRMED', 'IN_PRODUCTION', 'CANCELLED'],
-        'CONFIRMED': ['IN_PRODUCTION', 'CANCELLED'],
-        'IN_PRODUCTION': ['READY', 'CANCELLED'],
-        'READY': ['DELIVERED', 'CANCELLED'],
-        'DELIVERED': [],
-        'CANCELLED': []
+      // Ajuste: tipar o mapa com o enum do Prisma para evitar 'undefined'
+      // e mapear o status do DTO para o correspondente do Prisma.
+      const validTransitions: Record<$Enums.OrderStatus, $Enums.OrderStatus[]> = {
+        PENDING: ['CONFIRMED', 'IN_PRODUCTION', 'CANCELLED'],
+        CONFIRMED: ['IN_PRODUCTION', 'CANCELLED'],
+        IN_PRODUCTION: ['READY', 'CANCELLED'],
+        READY: ['DELIVERED', 'CANCELLED'],
+        DELIVERED: [],
+        CANCELLED: []
       };
 
-      if (!validTransitions[order.status].includes(data.status)) {
+      // Conjunto de possíveis status do Prisma para o status de DTO solicitado
+      const prismaTargets = mapDTOStatusToPrisma(data.status);
+      // Permitidos a partir do status atual
+      const allowedFromCurrent = validTransitions[order.status] ?? [];
+      // Selecionar o primeiro alvo válido com base no estado atual
+      const selectedTarget = prismaTargets.find(s => allowedFromCurrent.includes(s));
+
+      if (!selectedTarget) {
+        // Comentário: antes comparávamos diretamente com strings de DTO,
+        // o que causava erro de transição inválida e TS2532 por acesso possivelmente undefined.
         throw new AppError(`Transição de status inválida: ${order.status} -> ${data.status}`, 400);
       }
 
       const updateData: Record<string, unknown> = {
-        status: data.status
+        // Comentário: gravar sempre o enum do Prisma, não o valor de DTO.
+        status: selectedTarget
       };
 
       // Atualizar datas baseado no status
+      // Comentário: regras de datas permanecem baseadas no status de DTO recebido.
       if (data.status === 'IN_PROGRESS' && !order.actualStartDate) {
         updateData.actualStartDate = new Date();
       }
@@ -787,24 +800,26 @@ export class OrderRepository {
     return {
       id: order.id!,
       number: order.number!,
-      quoteId: order.quoteId,
-      quoteNumber: order.quote?.number,
+      // Comentário: incluir apenas quando existir; evitar atribuir null a campos string.
+      ...(order.quoteId != null ? { quoteId: order.quoteId } : {}),
+      ...(order.quote?.number != null ? { quoteNumber: order.quote.number } : {}),
       partnerId: order.partnerId, // Mapeado
       partnerName: order.partner?.name || '',
       partnerDocument: order.partner?.document || '',
       title: order.title || '',
-      description: order.description || undefined,
+      // Comentário: com exactOptionalPropertyTypes, incluir apenas quando houver valor.
+      ...(order.description ? { description: order.description } : {}),
       status: order.status ? mapOrderStatus(order.status) : 'PENDING',
       // 
       priority: order.priority || 'MEDIUM',
-      expectedStartDate: order.expectedStartDate || undefined,
-      expectedEndDate: order.expectedEndDate || undefined,
-      actualStartDate: order.actualStartDate || undefined,
-      actualEndDate: order.actualEndDate || undefined,
-      paymentTerms: order.paymentTerms || undefined,
-      observations: order.notes || undefined, // Mapeado
+      ...(order.expectedStartDate ? { expectedStartDate: order.expectedStartDate } : {}),
+      ...(order.expectedEndDate ? { expectedEndDate: order.expectedEndDate } : {}),
+      ...(order.actualStartDate ? { actualStartDate: order.actualStartDate } : {}),
+      ...(order.actualEndDate ? { actualEndDate: order.actualEndDate } : {}),
+      ...(order.paymentTerms ? { paymentTerms: order.paymentTerms } : {}),
+      ...(order.notes ? { observations: order.notes } : {}), // Mapeado
       discount: order.discount.toNumber() || 0,
-      discountType: order.discountType || 'PERCENTAGE',
+      discountType: (order.discountType || 'PERCENTAGE') as 'FIXED' | 'PERCENTAGE',
       subtotal: order.items?.reduce((sum, item) => sum + (item.quantity.toNumber() * item.unitPrice.toNumber()), 0) || 0,
       discountValue: order.discountType === 'PERCENTAGE' && order.items && order.discount
         ? (order.items.reduce((sum, item) => sum + (item.quantity.toNumber() * item.unitPrice.toNumber()), 0) * order.discount.toNumber()) / 100
@@ -814,16 +829,19 @@ export class OrderRepository {
       // assignedToName: undefined,
       items: order.items.map((item) => ({
         id: item.id,
-        productId: item.productId,
+        // Comentário: com exactOptionalPropertyTypes, incluir productId apenas quando não for null,
+        // e garantir narrowing para string.
+        ...(item.productId != null ? { productId: item.productId as string } : {}),
         productName: item.product?.name || '',
         productCode: item.product?.sku || '',
         quantity: item.quantity.toNumber(),
         unitPrice: item.unitPrice.toNumber(),
         discount: item.discount.toNumber(),
-        discountType: item.discountType,
+        discountType: item.discountType as 'FIXED' | 'PERCENTAGE',
         subtotal: item.quantity.toNumber() * item.unitPrice.toNumber(),
         total: item.total.toNumber(),
-        observations: item.description || undefined, // Mapeado
+        // Comentário: incluir 'observations' apenas quando houver descrição.
+        ...(item.description ? { observations: item.description } : {}),
       })),
       timeTracking: order.timeTracking.map((tracking) => ({
         id: tracking.id,
@@ -831,8 +849,9 @@ export class OrderRepository {
         employeeName: tracking.employee.user.name,
         startTime: tracking.startTime,
         ...(tracking.endTime && { endTime: tracking.endTime }),
-        duration: tracking.duration || undefined,
-        description: tracking.description || undefined,
+        // Comentário: incluir 'duration' apenas quando definido (não null/undefined).
+        ...(tracking.duration != null ? { duration: tracking.duration as number } : {}),
+        ...(tracking.description ? { description: tracking.description } : {}),
         billable: tracking.billable,
         createdAt: tracking.createdAt,
       })),
@@ -840,9 +859,10 @@ export class OrderRepository {
         id: expense.id,
         description: expense.description,
         amount: expense.amount.toNumber(),
-        category: expense.category || undefined,
+        // Comentário: incluir campos opcionais somente se existirem (não null/undefined).
+        ...(expense.category != null ? { category: expense.category as string } : {}),
         date: expense.date,
-        receipt: expense.receipt || undefined,
+        ...(expense.receipt != null ? { receipt: expense.receipt as string } : {}),
         billable: expense.billable,
         createdAt: expense.createdAt,
       })),

@@ -22,13 +22,13 @@ export class StockRepository {
 
   async findStockItem(
     productId: string,
-    locationId: string,
+    locationId: string | undefined,
     companyId: string,
   ): Promise<StockItemResponseDTO | null> {
     const stockItem = await this.prisma.stockItem.findFirst({
       where: {
         productId,
-        locationId,
+        ...(locationId ? { locationId } : {}),
         companyId,
         deletedAt: null,
       },
@@ -248,10 +248,18 @@ export class StockRepository {
 
     const movement = await this.prisma.stockMovement.create({
       data: {
-        ...data,
+        productId: data.productId,
+        type: data.type,
+        quantity: data.quantity,
+        unitCost: data.unitCost ?? null,
+        totalCost,
+        reason: data.reason,
+        reference: data.reference ?? null,
+        fromLocationId: data.locationId ?? null,
+        toLocationId: data.destinationLocationId ?? null,
+        notes: data.notes ?? null,
         userId,
         companyId,
-        totalCost,
       },
       include: {
         product: {
@@ -281,8 +289,8 @@ export class StockRepository {
     return {
       id: movement.id,
       productId: movement.productId,
-      productName: movement.product?.name || null,
-      productCode: movement.product?.sku || null,
+      productName: (movement as any).product?.name || null,
+      productCode: (movement as any).product?.sku || null,
       type: movement.type as 'IN' | 'OUT' | 'ADJUSTMENT' | 'TRANSFER',
       quantity: movement.quantity.toNumber(),
       unitCost: movement.unitCost?.toNumber() || null,
@@ -290,12 +298,12 @@ export class StockRepository {
       reason: movement.reason,
       reference: movement.reference,
       locationId: movement.fromLocationId,
-      locationName: movement.fromLocation?.name || null,
+      locationName: (movement as any).fromLocation?.name || null,
       destinationLocationId: movement.toLocationId,
-      destinationLocationName: movement.toLocation?.name || null,
+      destinationLocationName: (movement as any).toLocation?.name || null,
       notes: movement.notes,
       userId: movement.userId,
-      userName: movement.user.name,
+      userName: (movement as any).user?.name || null,
       createdAt: movement.createdAt.toISOString(),
       batchNumber: null, // Add missing properties
       expirationDate: null, // Add missing properties
@@ -306,8 +314,8 @@ export class StockRepository {
     productId: string,
     locationId: string,
     quantityChange: number,
+    companyId: string,
     unitCost?: number,
-    companyId?: string,
   ): Promise<void> {
     const stockItem = await this.prisma.stockItem.findFirst({
       where: {
@@ -333,7 +341,7 @@ export class StockRepository {
         data: {
           productId,
           locationId,
-          companyId: companyId!,
+          companyId,
           quantity: quantityChange,
           reservedQuantity: 0,
           unitCost: unitCost || 0,
@@ -466,19 +474,26 @@ export class StockRepository {
     userId: string,
     companyId: string,
   ): Promise<StockReservationResponseDTO> {
+    const createData: Prisma.StockReservationUncheckedCreateInput = {
+      userId,
+      companyId,
+      status: 'ACTIVE',
+      expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+      productId: data.productId ?? null,
+      quantity: new Prisma.Decimal(data.quantity),
+      notes: data.reason ?? null,
+      locationId: data.locationId!,
+    };
+
+    if (data.referenceType === 'ORDER' && data.referenceId) {
+      createData.orderId = data.referenceId;
+    }
+    if (data.referenceType === 'QUOTE' && data.referenceId) {
+      createData.quoteId = data.referenceId;
+    }
+
     const reservation = await this.prisma.stockReservation.create({
-      data: {
-        userId,
-        companyId,
-        status: 'ACTIVE',
-        expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
-        productId: data.productId,
-        quantity: data.quantity,
-        notes: data.reason,
-        locationId: data.locationId!,
-        orderId: data.referenceType === 'ORDER' ? data.referenceId : undefined,
-        quoteId: data.referenceType === 'QUOTE' ? data.referenceId : undefined,
-      },
+      data: createData,
       include: {
         product: {
           select: {
@@ -499,21 +514,24 @@ export class StockRepository {
       },
     });
 
-    if (!reservation.product || !reservation.location || !reservation.user) throw new Error('Product, Location, or User not found');
+    const productRel = (reservation as any).product;
+    const locationRel = (reservation as any).location;
+    const userRel = (reservation as any).user;
+    if (!productRel || !locationRel || !userRel) throw new Error('Product, Location, or User not found');
 
     return {
       id: reservation.id,
       productId: reservation.productId,
-      productName: reservation.product.name,
-      productCode: reservation.product.sku,
+      productName: productRel.name,
+      productCode: productRel.sku,
       quantity: reservation.quantity.toNumber(),
       status: reservation.status as 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'FULFILLED',
       expiresAt: reservation.expiresAt?.toISOString() || null,
       locationId: reservation.locationId,
-      locationName: reservation.location.name,
+      locationName: locationRel.name,
       notes: reservation.notes,
       userId: reservation.userId,
-      userName: reservation.user.name,
+      userName: userRel.name,
       createdAt: reservation.createdAt.toISOString(),
       updatedAt: reservation.updatedAt.toISOString(),
       reason: reservation.notes, // Map notes back to reason
@@ -577,21 +595,24 @@ export class StockRepository {
       },
     });
 
-    if (!reservation || !reservation.product || !reservation.location || !reservation.user) return null;
+    const productRel = (reservation as any)?.product;
+    const locationRel = (reservation as any)?.location;
+    const userRel = (reservation as any)?.user;
+    if (!reservation || !productRel || !locationRel || !userRel) return null;
 
     return {
       id: reservation.id,
       productId: reservation.productId,
-      productName: reservation.product.name,
-      productCode: reservation.product.sku,
+      productName: productRel.name,
+      productCode: productRel.sku,
       quantity: reservation.quantity.toNumber(),
       status: reservation.status as 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'FULFILLED',
       expiresAt: reservation.expiresAt?.toISOString() || null,
       locationId: reservation.locationId,
-      locationName: reservation.location.name,
+      locationName: locationRel.name,
       notes: reservation.notes,
       userId: reservation.userId,
-      userName: reservation.user.name,
+      userName: userRel.name,
       createdAt: reservation.createdAt.toISOString(),
       updatedAt: reservation.updatedAt.toISOString(),
       reason: reservation.notes, // Map notes back to reason
@@ -714,7 +735,12 @@ export class StockRepository {
   ): Promise<StockLocationResponseDTO> {
     const location = await this.prisma.stockLocation.create({
       data: {
-        ...data,
+        name: data.name,
+        code: data.code ?? null,
+        type: data.type as any,
+        isActive: data.isActive ?? true,
+        description: data.description ?? null,
+        address: data.address ?? null,
         companyId,
       },
     });
@@ -761,8 +787,10 @@ export class StockRepository {
 
     if (!location) return null;
 
-    const totalValue = location.stockItems.reduce(
-      (sum, item) => sum + item.quantity.mul(item.unitCost).toNumber(),
+    const stockItemsList = (location as any).stockItems as Array<{ quantity: Prisma.Decimal; unitCost: Prisma.Decimal }>;
+    const totalValue = stockItemsList.reduce(
+      (sum: number, item: { quantity: Prisma.Decimal; unitCost: Prisma.Decimal }) =>
+        sum + item.quantity.mul(item.unitCost).toNumber(),
       0,
     );
 
@@ -774,7 +802,7 @@ export class StockRepository {
       type: location.type as 'WAREHOUSE' | 'STORE' | 'VIRTUAL',
       address: location.address,
       isActive: location.isActive,
-      totalProducts: location._count.stockItems,
+      totalProducts: (location as any)._count?.stockItems ?? stockItemsList.length,
       totalValue,
       createdAt: location.createdAt.toISOString(),
       updatedAt: location.updatedAt.toISOString(),
@@ -786,23 +814,27 @@ export class StockRepository {
     data: UpdateStockLocationDTO,
     companyId: string,
   ): Promise<StockLocationResponseDTO> {
+    const updateData: Prisma.StockLocationUpdateInput = {
+      updatedAt: new Date(),
+    };
+
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.code !== undefined) updateData.code = data.code ?? null;
+    if (data.description !== undefined) updateData.description = data.description ?? null;
+    if (data.type !== undefined) updateData.type = data.type as any;
+    if (data.address !== undefined) updateData.address = data.address ?? null;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+
     const location = await this.prisma.stockLocation.update({
       where: {
         id,
         companyId,
       },
-      data: {
-        ...data,
-        updatedAt: new Date(),
-      },
+      data: updateData,
       include: {
         _count: {
           select: {
-            stockItems: {
-              where: {
-                deletedAt: null,
-              },
-            },
+            stockItems: true,
           },
         },
         stockItems: {
@@ -817,8 +849,10 @@ export class StockRepository {
       },
     });
 
-    const totalValue = location.stockItems.reduce(
-      (sum, item) => sum + item.quantity.mul(item.unitCost).toNumber(),
+    const stockItemsList = (location as any).stockItems as Array<{ quantity: Prisma.Decimal; unitCost: Prisma.Decimal }>;
+    const totalValue = stockItemsList.reduce(
+      (sum: number, item: { quantity: Prisma.Decimal; unitCost: Prisma.Decimal }) =>
+        sum + item.quantity.mul(item.unitCost).toNumber(),
       0,
     );
 
@@ -830,7 +864,7 @@ export class StockRepository {
       type: location.type as 'WAREHOUSE' | 'STORE' | 'VIRTUAL',
       address: location.address,
       isActive: location.isActive,
-      totalProducts: location._count.stockItems,
+      totalProducts: (location as any)._count?.stockItems ?? stockItemsList.length,
       totalValue,
       createdAt: location.createdAt.toISOString(),
       updatedAt: location.updatedAt.toISOString(),
@@ -885,8 +919,11 @@ export class StockRepository {
     ]);
 
     const totalProducts = stockItems.length;
-    const totalValue = stockItems.reduce((sum, item) => 
-      sum + item.quantity.mul(item.unitCost).toNumber(), 0);
+    const totalValue = stockItems.reduce(
+      (sum: number, item: { quantity: Prisma.Decimal; unitCost: Prisma.Decimal }) =>
+        sum + item.quantity.mul(item.unitCost).toNumber(),
+      0,
+    );
     const lowStockProducts = stockItems.filter((item) => item.quantity.lte(item.minStock)).length;
     const outOfStockProducts = stockItems.filter((item) => item.quantity.lte(0)).length;
 

@@ -10,7 +10,7 @@ import {
   EmployeeStatsDto
 } from '../dtos';
 import { AppError } from '../../../shared/errors/AppError';
-import { validateCPF } from '../../../shared/utils/validators';
+import { validateCPF } from '@shared/utils/validators';
 import { RoleService } from '../../role/services';
 import { RoleRepository } from '../../role/repositories/role.repository';
 

@@ -10,6 +10,6 @@ declare module 'fastify' {
       id: string;
       companyId: string;
     };
-    userId?: string;
+    userId: string;
   }
 }

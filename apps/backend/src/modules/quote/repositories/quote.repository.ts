@@ -14,6 +14,7 @@ const quoteInclude = {
         product: {
           select: {
             name: true,
+            code: true,
           },
         },
       },
@@ -503,7 +504,7 @@ export class QuoteRepository {
         id: item.id,
         productId: item.productId || '',
         productName: item.product?.name || '',
-        productCode: (item.product as any)?.code || '',
+        productCode: item.product?.code || '',
         quantity: item.quantity.toNumber(),
         unitPrice: item.unitPrice.toNumber(),
         discount: item.discount.toNumber(),
@@ -511,7 +512,7 @@ export class QuoteRepository {
         subtotal: subtotal,
         discountValue: discountValue,
         total: itemTotal,
-        observations: item.description, // Mapeado
+        ...(item.description ? { observations: item.description } : {}), // Mapeado
       };
     });
 
@@ -526,14 +527,14 @@ export class QuoteRepository {
       number: quote.number,
       customerId: quote.partnerId, // Mapeado
       customerName: quote.partner?.name || '',
-      customerDocument: quote.partner?.document || undefined,
+      ...(quote.partner?.document ? { customerDocument: quote.partner.document } : {}),
       title: quote.title,
-      description: quote.description || undefined,
+      ...(quote.description ? { description: quote.description } : {}),
       status: quote.status,
       validUntil: quote.validUntil,
-      paymentTerms: quote.paymentTerms || undefined,
-      deliveryTerms: quote.deliveryTerms || undefined,
-      observations: quote.notes || undefined, // Mapeado
+      ...(quote.paymentTerms ? { paymentTerms: quote.paymentTerms } : {}),
+      ...(quote.deliveryTerms ? { deliveryTerms: quote.deliveryTerms } : {}),
+      ...(quote.notes ? { observations: quote.notes } : {}), // Mapeado
       discount: quote.discount.toNumber(),
       discountType: quote.discountType,
       subtotal: quote.subtotal.toNumber(),

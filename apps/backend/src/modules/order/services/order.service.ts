@@ -221,9 +221,9 @@ export class OrderService {
         companyId,
         startTime: new Date(data.startTime),
         endTime: data.endTime ? new Date(data.endTime) : null,
-        duration,
-        description: data.description,
-        billable: data.billable
+        duration: duration ?? null,
+        description: data.description ?? null,
+        billable: data.billable ?? true
       }
     });
   }
@@ -259,10 +259,10 @@ export class OrderService {
       billable?: boolean;
       duration?: number;
     } = {
-      startTime: data.startTime ? new Date(data.startTime) : undefined,
-      endTime: data.endTime ? new Date(data.endTime) : undefined,
-      description: data.description,
-      billable: data.billable
+      ...(data.startTime ? { startTime: new Date(data.startTime) } : {}),
+      ...(data.endTime ? { endTime: new Date(data.endTime) } : {}),
+      ...(data.description !== undefined ? { description: data.description } : {}),
+      ...(data.billable !== undefined ? { billable: data.billable } : {})
     };
 
     // Recalcular duração se necessário
@@ -336,10 +336,10 @@ export class OrderService {
         companyId,
         description: data.description,
         amount: data.amount,
-        category: data.category,
+        category: data.category ?? null,
         date: new Date(data.date),
-        receipt: data.receipt,
-        billable: data.billable
+        receipt: data.receipt ?? null,
+        billable: data.billable ?? true
       }
     });
   }
@@ -371,12 +371,12 @@ export class OrderService {
     await this.prisma.orderExpense.update({
       where: { id: expenseId },
       data: {
-        description: data.description,
-        amount: data.amount,
-        category: data.category,
-        date: data.date ? new Date(data.date) : undefined,
-        receipt: data.receipt,
-        billable: data.billable
+        ...(data.description !== undefined ? { description: data.description } : {}),
+        ...(data.amount !== undefined ? { amount: data.amount } : {}),
+        ...(data.category !== undefined ? { category: data.category ?? null } : {}),
+        ...(data.date !== undefined ? { date: new Date(data.date) } : {}),
+        ...(data.receipt !== undefined ? { receipt: data.receipt ?? null } : {}),
+        ...(data.billable !== undefined ? { billable: data.billable } : {})
       }
     });
   }

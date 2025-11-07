@@ -3,7 +3,7 @@ import { User } from '@artplim/types';
 
 declare module 'fastify' {
   interface FastifyRequest {
-    companyId?: string;
+    companyId: string;
   }
 }
 

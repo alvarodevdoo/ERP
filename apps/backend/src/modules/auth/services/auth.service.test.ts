@@ -6,8 +6,19 @@ import { AuthRepository } from '../repositories/auth.repository';
 
 // Mock do PrismaClient
 vi.mock('@prisma/client', () => {
-  const PrismaClient = vi.fn();
-  return { PrismaClient };
+  // Mock como uma classe para satisfazer o `new PrismaClient()` e a análise de tipo do editor.
+  return {
+    PrismaClient: class {
+      user: any; // Adicione as propriedades que são mockadas
+      refreshToken: any; // Adicione as propriedades que são mockadas
+
+      constructor() {
+        // As implementações do mock são atribuídas no `beforeEach`
+        this.user = {};
+        this.refreshToken = {};
+      }
+    }
+  };
 });
 
 // Mock do bcrypt

@@ -30,7 +30,8 @@ export class StockMovementRepository {
           ...(data.notes !== undefined && { notes: data.notes }),
           ...(data.unitCost !== undefined && { unitCost: data.unitCost }),
           ...(data.reference !== undefined && { reference: data.reference }),
-          ...(data.variationId !== undefined && { variationId: data.variationId })
+          // Prisma usa 'variantId' no modelo; alinhar com DTO 'variationId'
+          ...(data.variationId !== undefined && { variantId: data.variationId })
         },
         include: {
           product: {
@@ -376,25 +377,28 @@ export class StockMovementRepository {
         out: number;
         adjustment: number;
       }[]>((acc, curr) => {
-        const date = new Date(curr.date).toISOString().split('T')[0];
-        let entry = acc.find(item => item.date === date);
+        const date = new Date(curr.date).toISOString().slice(0, 10);
+        const existingIndex = acc.findIndex(item => item.date === date);
 
-        if (!entry) {
-          entry = { date, in: 0, out: 0, adjustment: 0 };
-          acc.push(entry);
+        let currentEntry: { date: string; in: number; out: number; adjustment: number };
+        if (existingIndex === -1) {
+          currentEntry = { date, in: 0, out: 0, adjustment: 0 };
+          acc.push(currentEntry);
+        } else {
+          currentEntry = acc[existingIndex]!;
         }
 
         const count = Number(curr.count);
 
         switch (curr.type) {
           case 'IN':
-            entry.in += count;
+            currentEntry.in += count;
             break;
           case 'OUT':
-            entry.out += count;
+            currentEntry.out += count;
             break;
           case 'ADJUSTMENT':
-            entry.adjustment += count;
+            currentEntry.adjustment += count;
             break;
         }
 
@@ -555,12 +559,17 @@ export class StockMovementRepository {
       id: movement.id,
       productId: movement.productId,
       product: movement.product,
+      variationId: movement.variantId ?? null,
+      // Não há relação 'variant' em StockMovement no Prisma; manter opcional
+      // variation: undefined,
       type: movement.type,
       quantity: Number(movement.quantity),
       unitCost: movement.unitCost ? Number(movement.unitCost) : null,
       totalCost: movement.totalCost ? Number(movement.totalCost) : null,
-      reason: movement.reason,
+      // Garantir string conforme schema
+      reason: movement.reason ?? '',
       reference: movement.reference,
+      notes: movement.notes ?? null,
       previousStock: prev,
       newStock: next,
       userId: movement.userId,

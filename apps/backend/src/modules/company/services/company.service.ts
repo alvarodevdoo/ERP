@@ -2,7 +2,7 @@ import { CompanyRepository } from '../repositories';
 import { CreateCompanyDto, UpdateCompanyDto, CompanyFiltersDto, CompanyResponseDto, CompanyListResponseDto } from '../dtos';
 import { logger } from '../../../shared/logger/index';
 import { AppError } from '../../../shared/errors/AppError';
-import { validateCNPJ } from '../../../shared/utils/validators';
+import { validateCNPJ } from '@shared/utils/validators';
 
 /**
  * Service para operações de empresa
@@ -258,6 +258,7 @@ export class CompanyService {
     return {
       id: company.id,
       name: company.name,
+      tradeName: company.tradeName || null,
       cnpj: company.cnpj,
       email: company.email,
       phone: company.phone,
@@ -271,6 +272,12 @@ export class CompanyService {
       isActive: company.isActive,
       createdAt: company.createdAt,
       updatedAt: company.updatedAt,
+      _count: company._count ? {
+        users: company._count.users || 0,
+        employees: company._count.employees || 0,
+        products: company._count.products || 0,
+        orders: company._count.orders || 0,
+      } : undefined,
     };
   }
 }

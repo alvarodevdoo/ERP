@@ -24,7 +24,7 @@ export class RoleService {
     permissions: Permission[]; 
     company: { id: string; name: string; cnpj: string };
     _count: { employees: number };
-  } | null> {
+  }> {
     const role = await this.roleRepository.findById(id);
     if (!role) {
       throw new AppError('Role não encontrada.', 404);

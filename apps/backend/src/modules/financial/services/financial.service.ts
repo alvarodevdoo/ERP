@@ -764,17 +764,28 @@ export class FinancialService {
   }
 
   private convertToCSV(data: FinancialReportDTO[]): string {
-    if (data.length === 0) return '';
+    // Se o array estiver vazio ou não for um array com elementos, retorne uma string vazia.
+    if (!Array.isArray(data) || data.length === 0) {
+      return '';
+    }
+    // Garantir que data[0] seja um objeto válido antes de pegar as chaves
+    const firstRow = data[0];
 
-    const headers = Object.keys(data[0]).join(',');
-    const rows = data.map(row => 
-      Object.values(row).map(value => 
-        typeof value === 'string' && value.includes(',') 
-          ? `"${value}"` 
-          : value
-      ).join(',')
+    // Verificação adicional para garantir que é um objeto (embora o DTO garanta isso)
+    if (typeof firstRow !== 'object' || firstRow === null) {
+      // Isso é improvável de acontecer com DTOs tipados, mas adiciona robustez
+      return '';
+    }
+    // Esta linha agora está segura:
+    const headers = Object.keys(firstRow).join(',');
+
+    const rows = data.map(row => {
+      return Object.values(row).map(value => typeof value === 'string' && value.includes(',')
+        ? `"${value}"`
+        : value
+      ).join(',');
+    }
     );
-
     return [headers, ...rows].join('\n');
   }
 }

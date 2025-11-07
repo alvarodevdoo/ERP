@@ -13,7 +13,7 @@ export const paginationSchema = z.object({
   limit: z.number().int().min(1).max(100).default(20),
   search: z.string().optional(),
   sortBy: z.string().optional(),
-  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+  sortOrder: z.enum(['asc', 'desc'] as const).default('desc'),
 });
 
 // Validadores de Company
@@ -99,7 +99,7 @@ export const createVariantSchema = z.object({
   productId: z.string().uuid('ID do produto inválido'),
   name: z.string().min(1, 'Nome é obrigatório'),
   sku: z.string().min(1, 'SKU é obrigatório'),
-  attributes: z.record(z.string()).default({}),
+  attributes: z.record(z.string(), z.string()).default({}),
   costPrice: z.number().positive('Preço de custo deve ser positivo'),
   salePrice: z.number().positive('Preço de venda deve ser positivo'),
   currentStock: z.number().int().min(0, 'Estoque atual deve ser maior ou igual a 0').default(0),
@@ -138,9 +138,7 @@ export const updateFinishSchema = createFinishSchema.partial();
 // Validadores de Partner
 export const createPartnerSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
-  type: z.enum(['CUSTOMER', 'SUPPLIER', 'BOTH'], {
-    errorMap: () => ({ message: 'Tipo deve ser CUSTOMER, SUPPLIER ou BOTH' }),
-  }),
+  type: z.enum(['CUSTOMER', 'SUPPLIER', 'BOTH'] as const),
   document: z.string().min(1, 'Documento é obrigatório'),
   email: emailSchema.optional(),
   phone: phoneSchema.optional(),
@@ -211,9 +209,7 @@ export const createStockMovementSchema = z.object({
   productId: z.string().uuid('ID do produto inválido').optional(),
   variantId: z.string().uuid('ID da variante inválido').optional(),
   inputItemId: z.string().uuid('ID do insumo inválido').optional(),
-  type: z.enum(['IN', 'OUT', 'ADJUSTMENT'], {
-    errorMap: () => ({ message: 'Tipo deve ser IN, OUT ou ADJUSTMENT' }),
-  }),
+  type: z.enum(['IN', 'OUT', 'ADJUSTMENT'] as const),
   quantity: z.number().positive('Quantidade deve ser positiva'),
   unitCost: z.number().positive('Custo unitário deve ser positivo').optional(),
   totalCost: z.number().positive('Custo total deve ser positivo').optional(),
@@ -226,9 +222,7 @@ export const updateStockMovementSchema = createStockMovementSchema.partial();
 
 // Validadores de FinancialEntry
 export const createFinancialEntrySchema = z.object({
-  type: z.enum(['INCOME', 'EXPENSE'], {
-    errorMap: () => ({ message: 'Tipo deve ser INCOME ou EXPENSE' }),
-  }),
+  type: z.enum(['INCOME', 'EXPENSE'] as const),
   category: z.string().min(1, 'Categoria é obrigatória'),
   description: z.string().min(1, 'Descrição é obrigatória'),
   amount: z.number().positive('Valor deve ser positivo'),
@@ -269,7 +263,7 @@ export const stockReportSchema = z.object({
 });
 
 export const financialReportSchema = baseDateRangeSchema.extend({
-  type: z.enum(['INCOME', 'EXPENSE', 'BOTH']).default('BOTH'),
+  type: z.enum(['INCOME', 'EXPENSE', 'BOTH'] as const).default('BOTH'),
   category: z.string().optional(),
   partnerId: z.string().uuid().optional(),
 }).refine((data) => data.startDate <= data.endDate, {

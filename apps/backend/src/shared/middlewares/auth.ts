@@ -32,7 +32,7 @@ type AuthenticatedUser = PrismaUserWithRelations;
 declare module 'fastify' {
   interface FastifyRequest {
     user?: AuthenticatedUser;
-    userId?: string;
+    userId: string;
   }
 }
 
@@ -45,7 +45,7 @@ interface JwtPayload {
 
 export async function authMiddleware(fastify: FastifyInstance) {
   fastify.decorateRequest('user', undefined);
-  fastify.decorateRequest('userId', undefined);
+  fastify.decorateRequest('userId', '');
 
   fastify.addHook('preHandler', async (request: FastifyRequest) => {
     // Skip auth for public routes

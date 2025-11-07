@@ -84,6 +84,7 @@ export interface QuoteItemResponseDTO {
   unitPrice: number;
   discount: number;
   discountType: 'PERCENTAGE' | 'FIXED';
+  discountValue: number;
   subtotal: number;
   total: number;
   observations?: string;

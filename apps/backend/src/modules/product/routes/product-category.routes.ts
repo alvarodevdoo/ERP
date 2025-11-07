@@ -44,9 +44,8 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     },
     async (request: FastifyRequest<{ Body: CreateProductCategoryDto }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request;
-        const category = await categoryService.create(request.body, companyId, userId);
-        
+        const category = await categoryService.create(request.body, request.companyId!, request.userId!);
+
         return reply.code(201).send({
           success: true,
           data: category,
@@ -81,10 +80,9 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
       };
     }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request;
         const includeInactive = request.query.active === false ? true : false;
-        const result = await categoryService.findMany(companyId, userId, includeInactive);
-        
+        const result = await categoryService.findMany(request.companyId!, request.userId!, includeInactive);
+
         return reply.send({
           success: true,
           data: result
@@ -104,16 +102,15 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     '/:id',
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request;
-        const category = await categoryService.findById(request.params.id, companyId, userId);
-        
+        const category = await categoryService.findById(request.params.id, request.companyId!, request.userId!);
+
         if (!category) {
           return reply.code(404).send({
             success: false,
             message: 'Categoria não encontrada'
           });
         }
-        
+
         return reply.send({
           success: true,
           data: category
@@ -137,14 +134,13 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     },
     async (request: FastifyRequest<{ Params: { id: string }; Body: UpdateProductCategoryDto }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request;
         const category = await categoryService.update(
           request.params.id,
           request.body,
-          companyId,
-          userId
+          request.companyId!,
+          request.userId!
         );
-        
+
         return reply.send({
           success: true,
           data: category,
@@ -165,9 +161,8 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     '/:id',
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request;
-        await categoryService.delete(request.params.id, companyId, userId);
-        
+        await categoryService.delete(request.params.id, request.companyId!, request.userId!);
+
         return reply.send({
           success: true,
           message: 'Categoria excluída com sucesso'
@@ -187,9 +182,14 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     '/:id/restore',
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request;
-        const category = await categoryService.restore(request.params.id, companyId, userId);
-        
+        if (!request.companyId) {
+          return reply.code(400).send({ success: false, message: 'companyId é obrigatório' });
+        }
+        if (!request.userId) {
+          return reply.code(400).send({ success: false, message: 'userId é obrigatório' });
+        }
+        const category = await categoryService.restore(request.params.id, request.companyId, request.userId);
+
         return reply.send({
           success: true,
           data: category,
@@ -208,9 +208,14 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     '/root',
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { companyId, userId } = request;
-        const categories = await categoryService.findRootCategories(companyId, userId);
-        
+        if (!request.companyId) {
+          return reply.code(400).send({ success: false, message: 'companyId é obrigatório' });
+        }
+        if (!request.userId) {
+          return reply.code(400).send({ success: false, message: 'userId é obrigatório' });
+        }
+        const categories = await categoryService.findRootCategories(request.companyId, request.userId);
+
         return reply.send({
           success: true,
           data: categories
@@ -231,8 +236,14 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({ success: false, message: 'companyId é obrigatório' });
+        }
+        if (!userId) {
+          return reply.code(400).send({ success: false, message: 'userId é obrigatório' });
+        }
         const children = await categoryService.findChildren(request.params.id, companyId, userId);
-        
+
         return reply.send({
           success: true,
           data: children
@@ -255,21 +266,27 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({ success: false, message: 'companyId é obrigatório' });
+        }
+        if (!userId) {
+          return reply.code(400).send({ success: false, message: 'userId é obrigatório' });
+        }
         const { name, parentId, excludeId } = request.query;
-        
+
         if (!name) {
           return reply.code(400).send({
             success: false,
             message: 'Nome é obrigatório'
           });
         }
-        
+
         const result = await categoryService.checkNameAvailability(
           name,
           companyId,
           excludeId
         );
-        
+
         return reply.send({
           success: true,
           data: result
@@ -291,17 +308,23 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
       try {
         const { companyId, userId } = request;
         const { categoryIds } = request.body;
-        
+
         if (!Array.isArray(categoryIds) || categoryIds.length === 0) {
           return reply.code(400).send({
             success: false,
             message: 'Lista de IDs de categorias é obrigatória'
           });
         }
-        
+
         const categoryOrders = categoryIds.map((id, index) => ({ id, sortOrder: index }));
+        if (!companyId || !userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId e userId são obrigatórios'
+          });
+        }
         await categoryService.reorder(categoryOrders, companyId, userId);
-        
+
         return reply.send({
           success: true,
           message: 'Categorias reordenadas com sucesso'
@@ -320,8 +343,14 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId || !userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId e userId são obrigatórios'
+          });
+        }
         const tree = await categoryService.getCategoryTree(companyId, userId);
-        
+
         return reply.send({
           success: true,
           data: tree
@@ -347,14 +376,14 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
       try {
         const { companyId, userId } = request;
         const { newParentId } = request.body;
-        
+
         const category = await categoryService.moveCategory(
           request.params.id,
-          newParentId,
+          newParentId ?? null,
           companyId,
           userId
         );
-        
+
         return reply.send({
           success: true,
           data: category,
@@ -381,14 +410,14 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
       try {
         const { companyId, userId } = request;
         const { name, includeProducts = false } = request.body;
-        
+
         const category = await categoryService.duplicate(
           request.params.id,
           name ?? '',
           companyId,
           userId
         );
-        
+
         return reply.code(201).send({
           success: true,
           data: category,
@@ -410,8 +439,14 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
-        
+
         // Buscar categoria
+        if (!companyId) {
+          return reply.code(400).send({ success: false, message: 'companyId é obrigatório' });
+        }
+        if (!userId) {
+          return reply.code(400).send({ success: false, message: 'userId é obrigatório' });
+        }
         const category = await categoryService.findById(request.params.id, companyId, userId);
         if (!category) {
           return reply.code(404).send({
@@ -419,10 +454,10 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
             message: 'Categoria não encontrada'
           });
         }
-        
+
         // Buscar subcategorias
         const children = await categoryService.findChildren(request.params.id, companyId, userId);
-        
+
         // Aqui você pode adicionar mais estatísticas conforme necessário
         const stats = {
           id: category.id,
@@ -430,7 +465,7 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
           totalSubcategories: children.length,
           hasChildren: children.length > 0
         };
-        
+
         return reply.send({
           success: true,
           data: stats

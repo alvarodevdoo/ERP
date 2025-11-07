@@ -263,9 +263,10 @@ export class ProductCategoryService {
       }
     }
 
+    // Ajustar null para undefined para alinhar com Update DTO (exata opcionalidade)
     return await this.categoryRepository.update(
       categoryId,
-      { parentId: newParentId },
+      { parentId: newParentId ?? undefined },
       companyId
     );
   }
@@ -296,8 +297,8 @@ export class ProductCategoryService {
     // Criar nova categoria com dados da original
     const duplicateData: CreateProductCategoryDto = {
       name: newName,
-      description: originalCategory.description,
-      parentId: originalCategory.parentId,
+      description: originalCategory.description ?? undefined,
+      parentId: originalCategory.parentId ?? undefined,
       isActive: originalCategory.isActive,
       sortOrder: originalCategory.sortOrder
     };

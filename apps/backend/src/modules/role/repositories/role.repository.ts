@@ -17,7 +17,7 @@ export class RoleRepository {
   // Cria uma nova role
   async create(data: {
     name: string;
-    description?: string | null;
+    description?: string | null | undefined;
     companyId: string;
     permissionIds: string[];
   }): Promise<Role & { 
@@ -28,7 +28,7 @@ export class RoleRepository {
     return this.prisma.role.create({
       data: {
         name: data.name,
-        description: data.description,
+        description: data.description ?? null,
         company: {
           connect: { id: data.companyId }
         },
@@ -114,9 +114,9 @@ export class RoleRepository {
 
   // Busca roles com filtros
   async findMany(filters: {
-    name?: string;
-    companyId?: string;
-    permissionId?: string;
+    name?: string | undefined;
+    companyId?: string | undefined;
+    permissionId?: string | undefined;
     page: number;
     limit: number;
   }): Promise<{
@@ -173,9 +173,9 @@ export class RoleRepository {
 
   // Atualiza uma role
   async update(id: string, data: {
-    name?: string;
-    description?: string | null;
-    permissionIds?: string[];
+    name?: string | undefined;
+    description?: string | null | undefined;
+    permissionIds?: string[] | undefined;
   }): Promise<Role & { 
     permissions: Permission[]; 
     company: { id: string; name: string; cnpj: string };

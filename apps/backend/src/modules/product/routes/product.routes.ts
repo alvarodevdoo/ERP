@@ -47,6 +47,18 @@ export async function productRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Body: CreateProductDto }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         const product = await productService.create(request.body, companyId, userId);
         
         return reply.code(201).send({
@@ -73,6 +85,18 @@ export async function productRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Querystring: ProductFiltersDto }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         const result = await productService.findMany(request.query, companyId, userId);
         
         return reply.send({
@@ -101,6 +125,18 @@ export async function productRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         const product = await productService.findById(request.params.id, companyId, userId);
         
         if (!product) {
@@ -134,6 +170,12 @@ export async function productRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Params: { id: string }; Body: UpdateProductDto }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({ success: false, message: 'companyId é obrigatório' });
+        }
+        if (!userId) {
+          return reply.code(400).send({ success: false, message: 'userId é obrigatório' });
+        }
         const product = await productService.update(
           request.params.id,
           request.body,
@@ -162,6 +204,18 @@ export async function productRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         await productService.delete(request.params.id, companyId, userId);
         
         return reply.send({
@@ -184,6 +238,18 @@ export async function productRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         const product = await productService.restore(request.params.id, companyId, userId);
         
         return reply.send({
@@ -212,7 +278,18 @@ export async function productRoutes(fastify: FastifyInstance) {
       try {
         const { companyId, userId } = request;
         const { page = 1, limit = 20, includeSubcategories = false } = request.query;
-        
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         const products = await productService.findByCategory(
           request.params.categoryId,
           companyId,
@@ -237,6 +314,18 @@ export async function productRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         const products = await productService.findLowStock(companyId, userId);
         
         return reply.send({
@@ -257,6 +346,18 @@ export async function productRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         const products = await productService.findOutOfStock(companyId, userId);
         
         return reply.send({
@@ -277,6 +378,18 @@ export async function productRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         const stats = await productService.getStats(companyId, userId);
         
         return reply.send({
@@ -303,6 +416,12 @@ export async function productRoutes(fastify: FastifyInstance) {
     }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({ success: false, message: 'companyId é obrigatório' });
+        }
+        if (!userId) {
+          return reply.code(400).send({ success: false, message: 'userId é obrigatório' });
+        }
         const { stock } = request.body;
         
         if (typeof stock !== 'number' || stock < 0) {
@@ -344,6 +463,12 @@ export async function productRoutes(fastify: FastifyInstance) {
     }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({ success: false, message: 'companyId é obrigatório' });
+        }
+        if (!userId) {
+          return reply.code(400).send({ success: false, message: 'userId é obrigatório' });
+        }
         const { adjustment, reason } = request.body;
         
         if (typeof adjustment !== 'number' || adjustment === 0) {
@@ -391,6 +516,12 @@ export async function productRoutes(fastify: FastifyInstance) {
     }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({ success: false, message: 'companyId é obrigatório' });
+        }
+        if (!userId) {
+          return reply.code(400).send({ success: false, message: 'userId é obrigatório' });
+        }
         const { sku, excludeId } = request.query;
         
         if (!sku) {
@@ -442,6 +573,12 @@ export async function productRoutes(fastify: FastifyInstance) {
     }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({ success: false, message: 'companyId é obrigatório' });
+        }
+        if (!userId) {
+          return reply.code(400).send({ success: false, message: 'userId é obrigatório' });
+        }
         const { categoryId, active, lowStock, format } = request.query;
         const filters: ProductFiltersDto = {
           page: 1,

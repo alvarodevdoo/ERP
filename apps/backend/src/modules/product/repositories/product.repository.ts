@@ -21,19 +21,36 @@ export class ProductRepository {
    */
   async create(data: CreateProductDto, companyId: string): Promise<ProductResponseDto> {
     try {
-      const { variations, ...productData } = data;
+      const { variations, dimensions, description, ...productData } = data;
+      // Remover propriedades com undefined para respeitar exactOptionalPropertyTypes
+      const cleanedProductData = Object.fromEntries(
+        Object.entries(productData).filter(([, value]) => value !== undefined)
+      ) as Record<string, unknown>;
 
       const product = await this.prisma.product.create({
         data: {
-          ...productData,
+          ...(cleanedProductData as any),
+          description: description ?? null,
           companyId,
-          variants: variations ? {
-            create: variations.map(variation => ({
-              ...variation,
-              companyId,
-              attributes: variation.attributes ? JSON.stringify(variation.attributes) : null
-            }))
-          } : undefined
+          ...(dimensions ? {
+            length: dimensions.length ?? null,
+            width: dimensions.width ?? null,
+            height: dimensions.height ?? null
+          } : {}),
+          ...(variations ? {
+            variants: {
+              create: variations.map(variation => ({
+                name: variation.name,
+                sku: variation.sku,
+                costPrice: variation.costPrice,
+                salePrice: variation.salePrice,
+                currentStock: variation.stock ?? 0,
+                // Comentário: remover companyId para satisfazer VariantCreateNestedManyWithoutProductInput.
+                // O ID da empresa é herdado via relacionamento de Product.
+                attributes: variation.attributes ?? {}
+              }))
+            }
+          } : {})
         },
         include: {
           category: {
@@ -120,7 +137,6 @@ export class ProductRepository {
           OR: [
             { name: { contains: search, mode: 'insensitive' } },
             { sku: { contains: search, mode: 'insensitive' } },
-            { barcode: { contains: search, mode: 'insensitive' } },
             { description: { contains: search, mode: 'insensitive' } }
           ]
         }),
@@ -161,9 +177,7 @@ export class ProductRepository {
               }
             }
           },
-          orderBy: {
-            [sortBy]: sortOrder
-          },
+          ...(sortBy ? { orderBy: { [sortBy]: sortOrder ?? 'asc' } } : {}),
           skip: (page - 1) * limit,
           take: limit
         }),
@@ -191,19 +205,32 @@ export class ProductRepository {
     try {
       const { dimensions, ...productData } = data;
 
+      // Construir objeto data filtrando undefined para exactOptionalPropertyTypes
+      const updateData: any = {
+        updatedAt: new Date()
+      };
+
+      // Adicionar apenas propriedades definidas
+      Object.entries(productData).forEach(([key, value]) => {
+        if (value !== undefined) {
+          updateData[key] = value;
+        }
+      });
+
+      // Adicionar dimensões se fornecidas
+      if (dimensions) {
+        if (dimensions.length !== undefined) updateData.length = dimensions.length;
+        if (dimensions.width !== undefined) updateData.width = dimensions.width;
+        if (dimensions.height !== undefined) updateData.height = dimensions.height;
+      }
+
       const product = await this.prisma.product.update({
         where: {
           id,
           companyId,
           deletedAt: null
         },
-        data: {
-          ...productData,
-          length: dimensions?.length,
-          width: dimensions?.width,
-          height: dimensions?.height,
-          updatedAt: new Date()
-        },
+        data: updateData,
         include: {
           category: {
             select: {
@@ -675,7 +702,7 @@ export class ProductRepository {
       barcode?: string;
       categoryId?: string;
       category?: { id: string; name: string; description?: string };
-      unitOfMeasure: string;
+      unit: string;
       costPrice: number;
       salePrice: number;
       minStock: number;
@@ -712,19 +739,25 @@ export class ProductRepository {
       name: prod.name,
       description: prod.description ?? '',
       sku: prod.sku,
-      barcode: prod.barcode,
-      categoryId: prod.categoryId,
-      category: prod.category,
-      unitOfMeasure: prod.unitOfMeasure,
-      unit: prod.unitOfMeasure,
+      barcode: prod.barcode ?? null,
+      categoryId: prod.categoryId ?? null,
+      category: prod.category ? {
+        id: prod.category.id,
+        name: prod.category.name,
+        description: prod.category.description ?? null
+      } : undefined,
+      unitOfMeasure: prod.unit,
+      unit: prod.unit,
       trackStock: (prod as any).trackStock ?? true,
+      wholesalePrice: (prod as any).wholesalePrice ?? null,
+      profitMargin: (prod as any).profitMargin ?? null,
       costPrice: prod.costPrice,
       salePrice: prod.salePrice,
       minStock: prod.minStock,
-      maxStock: prod.maxStock,
+      maxStock: prod.maxStock ?? null,
       currentStock: prod.currentStock,
-      location: prod.location,
-      weight: prod.weight,
+      location: prod.location ?? null,
+      weight: prod.weight ?? null,
       dimensions: {
         length: prod.length ?? null,
         width: prod.width ?? null,
@@ -747,11 +780,11 @@ export class ProductRepository {
         attributes: variation.attributes ? JSON.parse(variation.attributes) : {}
       })) || [],
       tags: prod.tags || [],
-      notes: prod.notes,
+      notes: prod.notes ?? null,
       companyId: prod.companyId,
       createdAt: prod.createdAt,
       updatedAt: prod.updatedAt,
-      deletedAt: prod.deletedAt
+      deletedAt: (prod.deletedAt ?? null) as Date | null
     };
   }
 }

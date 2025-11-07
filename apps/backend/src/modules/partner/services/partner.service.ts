@@ -120,9 +120,13 @@ export class PartnerService {
 
     // Validações específicas por tipo
     if (data.type) {
-      this.validatePartnerByType({ ...existingPartner, ...data });
+      // A coerção de tipo (`as any`) seguida pela coerção para o tipo de união 
+      // do validatePartnerByType resolve a incompatibilidade de tipos
+      this.validatePartnerByType({ 
+          ...existingPartner, 
+          ...data 
+      } as CreatePartnerDTO); // Usamos CreatePartnerDTO ou o tipo da Entity, pois é o tipo mais completo com 'type'.
     }
-
     // Normaliza dados
     const normalizedData = this.normalizeUpdatePartnerData(data);
 

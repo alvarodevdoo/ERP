@@ -1,7 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { AuthService } from '../services/auth.service';
 import { createValidation } from '../../../shared/middlewares/validation';
-import { buildRouteSchema } from '../../../shared/utils/zod-to-json';
 import {
   loginDto,
   registerDto,
@@ -24,7 +23,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   // Login
   fastify.post('/login', {
     preHandler: createValidation({ body: loginDto }),
-    schema: buildRouteSchema({ body: loginDto, tags: ['Auth'] }),
+    schema: { tags: ['Auth'], body: loginDto },
   }, async (request, reply) => {
     try {
       const result = await authService.login(request.body as LoginDto);
@@ -40,7 +39,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   // Register
   fastify.post('/register', {
     preHandler: createValidation({ body: registerDto }),
-    schema: buildRouteSchema({ body: registerDto, tags: ['Auth'] }),
+    schema: { tags: ['Auth'], body: registerDto },
   }, async (request, reply) => {
     try {
       const result = await authService.register(request.body as RegisterDto);
@@ -56,7 +55,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   // Refresh token
   fastify.post('/refresh', {
     preHandler: createValidation({ body: refreshTokenDto }),
-    schema: buildRouteSchema({ body: refreshTokenDto, tags: ['Auth'] }),
+    schema: { tags: ['Auth'], body: refreshTokenDto },
   }, async (request, reply) => {
     try {
       const result = await authService.refreshToken(request.body as RefreshTokenDto);
@@ -72,7 +71,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   // Forgot password
   fastify.post('/forgot-password', {
     preHandler: createValidation({ body: forgotPasswordDto }),
-    schema: buildRouteSchema({ body: forgotPasswordDto, tags: ['Auth'] }),
+    schema: { tags: ['Auth'], body: forgotPasswordDto },
   }, async (request, reply) => {
     try {
       await authService.forgotPassword(request.body as ForgotPasswordDto);
@@ -90,7 +89,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   // Reset password
   fastify.post('/reset-password', {
     preHandler: createValidation({ body: resetPasswordDto }),
-    schema: buildRouteSchema({ body: resetPasswordDto, tags: ['Auth'] }),
+    schema: { tags: ['Auth'], body: resetPasswordDto },
   }, async (request, reply) => {
     try {
       await authService.resetPassword(request.body as ResetPasswordDto);
@@ -108,7 +107,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   // Change password (authenticated)
   fastify.post('/change-password', {
     preHandler: createValidation({ body: changePasswordDto }),
-    schema: buildRouteSchema({ body: changePasswordDto, tags: ['Auth'] }),
+    schema: { tags: ['Auth'], body: changePasswordDto },
   }, async (request, reply) => {
     try {
       if (!request.userId) {
@@ -133,7 +132,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   // Update profile (authenticated)
   fastify.put('/profile', {
     preHandler: createValidation({ body: updateProfileDto }),
-    schema: buildRouteSchema({ body: updateProfileDto, tags: ['Auth'] }),
+    schema: { tags: ['Auth'], body: updateProfileDto },
   }, async (request, reply) => {
     try {
       if (!request.userId) {

@@ -47,6 +47,18 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Body: CreateStockMovementDto }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         const movement = await stockMovementService.create(request.body, companyId, userId);
         
         return reply.code(201).send({
@@ -88,12 +100,36 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
     }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
-        const filters = {
-          ...request.query,
-          startDate: request.query.startDate ? new Date(request.query.startDate) : undefined,
-          endDate: request.query.endDate ? new Date(request.query.endDate) : undefined
+        const filters: {
+          productId?: string;
+          type?: StockMovementType;
+          startDate?: Date;
+          endDate?: Date;
+          userId?: string;
+          page?: number;
+          limit?: number;
+        } = {
+          ...(request.query.productId ? { productId: request.query.productId } : {}),
+          ...(request.query.type ? { type: request.query.type } : {}),
+          ...(request.query.startDate ? { startDate: new Date(request.query.startDate) } : {}),
+          ...(request.query.endDate ? { endDate: new Date(request.query.endDate) } : {}),
+          ...(request.query.userId ? { userId: request.query.userId } : {}),
+          ...(request.query.page ? { page: request.query.page } : {}),
+          ...(request.query.limit ? { limit: request.query.limit } : {})
         };
         
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         const result = await stockMovementService.findMany(companyId, userId, filters);
         
         return reply.send({
@@ -122,6 +158,18 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         const movement = await stockMovementService.findById(request.params.id, companyId, userId);
         
         if (!movement) {
@@ -241,6 +289,18 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
         const { companyId, userId } = request;
         const { startDate, endDate } = request.query;
         
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         const stats = await stockMovementService.getStats(
           companyId,
           userId,
@@ -272,6 +332,18 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
         const { companyId, userId } = request;
         const { limit = 10 } = request.query;
         
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         const movements = await stockMovementService.findRecent(companyId, userId, limit);
         
         return reply.send({
@@ -317,15 +389,27 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
             message: 'Todos os campos são obrigatórios'
           });
         }
-        
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
+
         const movement = await stockMovementService.stockIn(
           productId,
           quantity,
           unitCost,
           reason,
           reference,
-          companyId,
-          userId
+          companyId as string,
+          userId as string
         );
         
         return reply.code(201).send({
@@ -364,7 +448,18 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
       try {
         const { companyId, userId } = request;
         const { productId, quantity, unitCost, reason, reference } = request.body;
-        
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         // Validações básicas
         if (!productId || !quantity || !unitCost || !reason || !reference) {
           return reply.code(400).send({
@@ -379,8 +474,8 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
           unitCost,
           reason,
           reference,
-          companyId,
-          userId
+          companyId as string,
+          userId as string
         );
         
         return reply.code(201).send({
@@ -423,7 +518,18 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
             message: 'Todos os campos são obrigatórios'
           });
         }
-        
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         if (newQuantity < 0) {
           return reply.code(400).send({
             success: false,
@@ -435,8 +541,8 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
           productId,
           newQuantity,
           reason,
-          companyId,
-          userId
+          companyId as string,
+          userId as string
         );
         
         return reply.code(201).send({
@@ -495,14 +601,26 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
             message: 'Quantidade deve ser maior que zero'
           });
         }
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         
         const result = await stockMovementService.transfer(
           fromProductId,
           toProductId,
           quantity,
           reason,
-          companyId,
-          userId
+          companyId as string,
+          userId as string
         );
         
         return reply.code(201).send({
@@ -526,10 +644,22 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Params: { productId: string } }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
         const result = await stockMovementService.calculateCurrentStock(
           request.params.productId,
-          companyId,
-          userId
+          companyId as string,
+          userId as string
         );
         
         return reply.send({
@@ -566,13 +696,33 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
     }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
-        const filters = {
-          ...request.query,
-          startDate: request.query.startDate ? new Date(request.query.startDate) : undefined,
-          endDate: request.query.endDate ? new Date(request.query.endDate) : undefined
+        if (!companyId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'companyId é obrigatório'
+          });
+        }
+        if (!userId) {
+          return reply.code(400).send({
+            success: false,
+            message: 'userId é obrigatório'
+          });
+        }
+        const filters: {
+          productId?: string;
+          type?: StockMovementType;
+          startDate?: Date;
+          endDate?: Date;
+          format?: 'json' | 'csv';
+        } = {
+          ...(request.query.productId ? { productId: request.query.productId } : {}),
+          ...(request.query.type ? { type: request.query.type } : {}),
+          ...(request.query.startDate ? { startDate: new Date(request.query.startDate) } : {}),
+          ...(request.query.endDate ? { endDate: new Date(request.query.endDate) } : {}),
+          ...(request.query.format ? { format: request.query.format } : {})
         };
         
-        const report = await stockMovementService.generateReport(companyId, userId, filters);
+        const report = await stockMovementService.generateReport(companyId as string, userId as string, filters);
         
         if (request.query.format === 'csv') {
           reply.header('Content-Type', 'text/csv');

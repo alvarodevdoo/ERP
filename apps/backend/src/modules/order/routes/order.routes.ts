@@ -23,7 +23,6 @@ import { OrderService } from '../services';
 import { requirePermission, authMiddleware } from '../../../shared/middlewares/auth';
 import { createValidation, commonSchemas } from '../../../shared/middlewares/validation';
 import { extractTenant } from '../../../shared/middlewares/tenant';
-import { buildRouteSchema } from '../../../shared/utils/zod-to-json';
 
 import { AppError } from '../../../shared/errors/AppError';
 
@@ -42,7 +41,7 @@ export async function orderRoutes(fastify: FastifyInstance) {
       requirePermission('orders:create'),
       createValidation({ body: createOrderSchema })
     ],
-    schema: buildRouteSchema({ body: createOrderSchema, tags: ['Orders'] }),
+    schema: { tags: ['Orders'], body: createOrderSchema },
     handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { companyId, id: userId } = request.user!;
@@ -79,7 +78,7 @@ export async function orderRoutes(fastify: FastifyInstance) {
       requirePermission('orders:read'),
       createValidation({ querystring: orderFiltersSchema })
     ],
-    schema: buildRouteSchema({ querystring: orderFiltersSchema, tags: ['Orders'] }),
+    schema: { tags: ['Orders'], querystring: orderFiltersSchema },
     handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { companyId, id: userId } = request.user!;
@@ -118,7 +117,7 @@ export async function orderRoutes(fastify: FastifyInstance) {
    */
   fastify.get('/:id', {
     preHandler: [requirePermission('orders:read')],
-    schema: buildRouteSchema({ params: commonSchemas.idParam, tags: ['Orders'] }),
+    schema: { tags: ['Orders'], params: commonSchemas.idParam },
     handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         //  - Params typing
@@ -154,7 +153,7 @@ export async function orderRoutes(fastify: FastifyInstance) {
       requirePermission('orders:update'),
       createValidation({ body: updateOrderSchema })
     ],
-    schema: buildRouteSchema({ params: commonSchemas.idParam, body: updateOrderSchema, tags: ['Orders'] }),
+    schema: { tags: ['Orders'], params: commonSchemas.idParam, body: updateOrderSchema },
     handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { companyId, id: userId } = request.user as { companyId: string; id: string };        
@@ -187,7 +186,7 @@ export async function orderRoutes(fastify: FastifyInstance) {
    */
   fastify.delete('/:id', {
     preHandler: [requirePermission('orders:delete')],
-    schema: buildRouteSchema({ params: commonSchemas.idParam, tags: ['Orders'] }),
+    schema: { tags: ['Orders'], params: commonSchemas.idParam },
     handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { companyId, id: userId } = request.user as { companyId: string; id: string };
@@ -219,7 +218,7 @@ export async function orderRoutes(fastify: FastifyInstance) {
    */
   fastify.post('/:id/restore', {
     preHandler: [requirePermission('orders:restore')],
-    schema: buildRouteSchema({ params: commonSchemas.idParam, tags: ['Orders'] }),
+    schema: { tags: ['Orders'], params: commonSchemas.idParam },
     handler:async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { companyId, id: userId } = request.user!;        

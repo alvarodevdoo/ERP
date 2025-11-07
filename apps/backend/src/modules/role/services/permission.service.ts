@@ -1,9 +1,9 @@
 import { PrismaClient, Permission } from '@prisma/client';
 import { PermissionRepository } from '../repositories';
-import { 
-  CreatePermissionDto, 
-  UpdatePermissionDto, 
-  PermissionFiltersDto 
+import {
+  CreatePermissionDto,
+  UpdatePermissionDto,
+  PermissionFiltersDto
 } from '../dtos';
 import { AppError } from '../../../shared/errors/AppError';
 import { logger } from '../../../shared/logger/index';
@@ -47,7 +47,7 @@ export class PermissionService {
    */
   async findById(id: string): Promise<Permission & { _count: { roles: number } }> {
     const permission = await this.permissionRepository.findById(id);
-    
+
     if (!permission) {
       throw new AppError('Permissão não encontrada', 404);
     }
@@ -66,7 +66,7 @@ export class PermissionService {
     totalPages: number;
   }> {
     const result = await this.permissionRepository.findMany(filters);
-    
+
     return {
       ...result,
       page: filters.page,
@@ -89,7 +89,7 @@ export class PermissionService {
       if (data.resource || data.action) {
         const resource = data.resource || existingPermission.resource;
         const action = data.action || existingPermission.action;
-        
+
         const exists = await this.permissionRepository.exists(resource, action, id);
         if (exists) {
           throw new AppError(`Já existe uma permissão para o recurso '${resource}' com a ação '${action}'`, 400);
@@ -212,12 +212,11 @@ export class PermissionService {
   async findGroupedByResource(): Promise<Record<string, Permission[]>> {
     try {
       const permissions = await this.permissionRepository.findAllActive();
-      
+
       const grouped = permissions.reduce((acc: Record<string, Permission[]>, permission) => {
-        if (!acc[permission.resource]) {
-          acc[permission.resource] = [];
-        }
-        acc[permission.resource].push(permission);
+        const key = permission.resource;
+        const list = acc[key] || (acc[key] = []);
+        list.push(permission);
         return acc;
       }, {} as Record<string, Permission[]>);
 
@@ -267,7 +266,7 @@ export class PermissionService {
   }> {
     try {
       const permission = await this.permissionRepository.findById(id);
-      
+
       if (!permission) {
         return {
           canDelete: false,
@@ -277,7 +276,7 @@ export class PermissionService {
       }
 
       const canDelete = permission._count.roles === 0;
-      
+
       return {
         canDelete,
         reason: canDelete ? undefined : 'Permissão está sendo usada por uma ou mais roles',
@@ -311,10 +310,13 @@ export class PermissionService {
       const inactive = total - active;
 
       // Agrupa por recurso
-      const byResource = activePermissions.reduce((acc, permission) => {
+      const byResource = activePermissions.reduce((acc: Record<string, number>, permission: Permission) => {
+        // O TypeScript agora sabe que 'acc' é Record<string, number>
+        // e 'permission' é do tipo Permission.
+        // Acessar 'permission.resource' e usar 'acc[permission.resource]' deve funcionar se 'resource' for 'string'.
         acc[permission.resource] = (acc[permission.resource] || 0) + 1;
         return acc;
-      }, {} as Record<string, number>);
+      }, {} as Record<string, number>); // Mantenha o 'as Record<string, number>' como fallback para o valor inicial
 
       // Agrupa por ação
       const byAction = activePermissions.reduce((acc, permission) => {

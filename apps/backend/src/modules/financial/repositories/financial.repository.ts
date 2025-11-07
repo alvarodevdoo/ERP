@@ -447,10 +447,7 @@ export class FinancialRepository {
       dueDate: e.dueDate.toISOString(),
       ...(e.paidDate ? { paymentDate: e.paidDate.toISOString() } : {}),
       status: e.status,
-      paymentMethod: undefined,
-      tags: undefined,
-      notes: e.notes || undefined,
-      referenceType: undefined,
+      ...(e.notes != null ? { notes: e.notes } : {}),
       userName: e.user?.name || ''
     }));
   }

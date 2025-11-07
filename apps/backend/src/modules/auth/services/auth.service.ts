@@ -19,6 +19,7 @@ import {
 } from '../dtos';
 import { UserRepository } from '../../user/repositories/user.repository';
 import { CompanyRepository } from '../../company/repositories/company.repository';
+import { RoleRepository } from '../../role/repositories/role.repository';
 
 /**
  * Serviço de autenticação
@@ -28,15 +29,12 @@ export class AuthService {
   private authRepository: AuthRepository;
   private prisma: PrismaClient;
   // Repositório de roles para verificação de permissões
-  private roleRepository: import('../../role/repositories/role.repository').RoleRepository;
+  private roleRepository: RoleRepository;
 
   constructor(prisma: PrismaClient, authRepository?: AuthRepository) {
     this.prisma = prisma;
     this.authRepository = authRepository || new AuthRepository();
-    //  - Usando import dinâmico em vez de require
-    import('../../role/repositories/role.repository').then(module => {
-      this.roleRepository = new module.RoleRepository(this.prisma);
-    });
+    this.roleRepository = new RoleRepository(this.prisma);
   }
   async login(data: LoginDto): Promise<LoginResponseDto> {
     const { email, password } = data;

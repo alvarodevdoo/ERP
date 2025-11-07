@@ -123,7 +123,7 @@ export type UpdateOrderExpenseDTO = z.infer<typeof updateOrderExpenseSchema>;
 // Interfaces de resposta
 export interface OrderItemResponseDTO {
   id: string;
-  productId: string;
+  productId?: string;
   productName: string;
   productCode: string;
   quantity: number;
@@ -151,7 +151,7 @@ export interface OrderExpenseResponseDTO {
   id: string;
   description: string;
   amount: number;
-  category: string;
+  category?: string;
   date: Date;
   receipt?: string;
   billable: boolean;
