@@ -21,7 +21,7 @@ export class ProductRepository {
    */
   async create(data: CreateProductDto, companyId: string): Promise<ProductResponseDto> {
     try {
-      const { variations, dimensions, description, ...productData } = data;
+      const { variations, dimensions, description, maxStock, initialStock, location, notes, ...productData } = data;
       // Remover propriedades com undefined para respeitar exactOptionalPropertyTypes
       const cleanedProductData = Object.fromEntries(
         Object.entries(productData).filter(([, value]) => value !== undefined)
@@ -66,6 +66,7 @@ export class ProductRepository {
 
       return this.formatProductResponse(product);
     } catch (error) {
+      console.error('ProductRepository.create error:', error);
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
           throw new AppError('SKU já existe para esta empresa', 409);
@@ -127,38 +128,73 @@ export class ProductRepository {
         page,
         limit,
         sortBy,
-        sortOrder
+        sortOrder,
+        showDeleted // New filter
       } = filters;
 
       const where: Prisma.ProductWhereInput = {
         companyId,
-        deletedAt: null,
-        ...(search && {
+      };
+
+      // Aplicar filtro deletedAt primeiro, a menos que isActive seja explicitamente false
+      if (isActive !== false) { // Se isActive for true ou undefined
+        if (showDeleted) {
+          Object.assign(where, { deletedAt: { not: null } }); // Mostrar apenas deletados
+        } else {
+          Object.assign(where, { deletedAt: null }); // Mostrar apenas não deletados
+        }
+      }
+
+      // Aplicar filtro isActive
+      if (isActive !== undefined) {
+        Object.assign(where, { isActive });
+      }
+
+      // Outros filtros
+      if (search) {
+        Object.assign(where, {
           OR: [
             { name: { contains: search, mode: 'insensitive' } },
             { sku: { contains: search, mode: 'insensitive' } },
             { description: { contains: search, mode: 'insensitive' } }
           ]
-        }),
-        ...(categoryId && { categoryId }),
-        ...(isActive !== undefined && { isActive }),
-        ...(isService !== undefined && { isService }),
-        ...(hasVariations !== undefined && { hasVariations }),
-        ...(minPrice !== undefined && { salePrice: { gte: minPrice } }),
-        ...(maxPrice !== undefined && { salePrice: { lte: maxPrice } }),
-        ...(inStock !== undefined && inStock && { currentStock: { gt: 0 } }),
-        ...(lowStock !== undefined && lowStock && {
+        });
+      }
+      if (categoryId) {
+        Object.assign(where, { categoryId });
+      }
+      if (isService !== undefined) {
+        Object.assign(where, { isService });
+      }
+      if (hasVariations !== undefined) {
+        Object.assign(where, { hasVariations });
+      }
+      if (minPrice !== undefined) {
+        Object.assign(where, { salePrice: { gte: minPrice } });
+      }
+      if (maxPrice !== undefined) {
+        Object.assign(where, { salePrice: { lte: maxPrice } });
+      }
+      if (inStock !== undefined && inStock) {
+        Object.assign(where, { currentStock: { gt: 0 } });
+      }
+      if (lowStock !== undefined && lowStock) {
+        Object.assign(where, {
           OR: [
-            { currentStock: { lte: 10 } }, // fallback para produtos com estoque baixo
+            { currentStock: { lte: 10 } },
             { currentStock: { lte: this.prisma.product.fields.minStock } }
           ]
-        }),
-        ...(tags && tags.length > 0 && {
+        });
+      }
+      if (tags && tags.length > 0) {
+        Object.assign(where, {
           tags: {
             hasSome: tags
           }
-        })
-      };
+        });
+      }
+
+      console.log('ProductRepository.findMany - Constructed WHERE clause:', JSON.stringify(where, null, 2)); // DEBUG LOG
 
       const [products, total] = await Promise.all([
         this.prisma.product.findMany({
@@ -183,6 +219,9 @@ export class ProductRepository {
         }),
         this.prisma.product.count({ where })
       ]);
+
+      console.log('ProductRepository.findMany - Products found:', products.length); // DEBUG LOG
+      console.log('ProductRepository.findMany - Total count:', total); // DEBUG LOG
 
       const formattedProducts = products.map(product => this.formatProductResponse(product));
 
@@ -228,7 +267,6 @@ export class ProductRepository {
         where: {
           id,
           companyId,
-          deletedAt: null
         },
         data: updateData,
         include: {

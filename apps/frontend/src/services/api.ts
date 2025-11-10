@@ -56,21 +56,21 @@ api.interceptors.response.use(
               refreshToken: state.token,
             })
             
-            const { token } = refreshResponse.data
+            const { token: newAccessToken, refreshToken: newRefreshToken } = refreshResponse.data;
             
-            // Update stored token
+            const authStorageParsed = JSON.parse(authStorage);
             const updatedStorage = {
-              ...JSON.parse(authStorage),
+              ...authStorageParsed,
               state: {
-                ...state,
-                token,
+                ...authStorageParsed.state,
+                token: newAccessToken,
+                refreshToken: newRefreshToken,
               },
-            }
-            localStorage.setItem('auth-storage', JSON.stringify(updatedStorage))
+            };
             
-            // Retry original request with new token
-            originalRequest.headers.Authorization = `Bearer ${token}`
-            return api(originalRequest)
+            localStorage.setItem('auth-storage', JSON.stringify(updatedStorage));
+            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+            return api(originalRequest);
           }
         }
       } catch (refreshError) {
@@ -82,6 +82,7 @@ api.interceptors.response.use(
     }
     
     // Handle other errors
+    console.error('Axios error response:', error.response?.data); // Added for detailed debugging
     const errorMessage = getErrorMessage(error)
     
     // Don't show toast for certain errors

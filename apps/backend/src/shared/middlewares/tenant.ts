@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyRequest } from 'fastify';
+import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { User } from '@artplim/types';
 
 declare module 'fastify' {
@@ -7,39 +7,37 @@ declare module 'fastify' {
   }
 }
 
-export async function tenantMiddleware(fastify: FastifyInstance) {
-  fastify.decorateRequest('companyId', '');
+export async function tenantPreHandler(request: FastifyRequest, reply: FastifyReply) { // Added reply: FastifyReply
+  console.log('Tenant PreHandler running for URL:', request.url); // DEBUG LOG
+  // Skip tenant isolation for public routes
+  const publicRoutes = [
+    '/health',
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/refresh',
+    '/api/auth/forgot-password',
+    '/api/auth/reset-password',
+  ];
 
-  fastify.addHook('preHandler', async (request: FastifyRequest) => {
-    // Skip tenant isolation for public routes
-    const publicRoutes = [
-      '/health',
-      '/api/auth/login',
-      '/api/auth/register',
-      '/api/auth/refresh',
-      '/api/auth/forgot-password',
-      '/api/auth/reset-password',
-    ];
+  // Allow Swagger UI and its assets/spec without tenant context
+  if (publicRoutes.includes(request.url) || request.url.startsWith('/docs')) {
+    return;
+  }
 
-    if (publicRoutes.includes(request.url)) {
-      return;
-    }
+  // Skip if user is not authenticated
+  if (!request.user) {
+    throw request.server.httpErrors.unauthorized('Authentication required for tenant context');
+  }
 
-    // Skip if user is not authenticated
-    if (!request.user) {
-      return;
-    }
-
-    // Usando unknown como intermediário para evitar erro de tipo
-    const user = request.user as unknown as User;
-    
-    // Set company ID from authenticated user
-    if (user.companyId) {
-      request.companyId = user.companyId;
-    } else {
-      throw fastify.httpErrors.forbidden('User is not associated with any company');
-    }
-  });
+  // Usando unknown como intermediário para evitar erro de tipo
+  const user = request.user as unknown as User;
+  
+  // Set company ID from authenticated user
+  if (user.companyId) {
+    request.companyId = user.companyId;
+  } else {
+    throw request.server.httpErrors.forbidden('User is not associated with any company');
+  }
 }
 
 // Helper function to add tenant filter to Prisma queries

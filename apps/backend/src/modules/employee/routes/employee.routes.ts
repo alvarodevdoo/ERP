@@ -8,8 +8,8 @@ import {
   updateEmployeeDto,
   employeeFiltersDto
 } from '../dtos';
-import { authMiddleware } from '../../../shared/middlewares/auth';
-import { tenantMiddleware } from '../../../shared/middlewares/tenant';
+import { authPreHandler } from '../../../shared/middlewares/auth';
+import { tenantPreHandler } from '../../../shared/middlewares/tenant';
 import { createValidation } from '../../../shared/middlewares/validation';
 import { AppError } from '../../../shared/errors/AppError';
 
@@ -20,9 +20,6 @@ import { AppError } from '../../../shared/errors/AppError';
 export async function employeeRoutes(fastify: FastifyInstance) {
   const employeeService = new EmployeeService();
 
-  // Registrar middlewares globais
-  await fastify.register(authMiddleware);
-  await fastify.register(tenantMiddleware);
 
   /**
    * Criar funcionário

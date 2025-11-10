@@ -121,155 +121,162 @@ export type AddOrderExpenseDTO = z.infer<typeof addOrderExpenseSchema>;
 export type UpdateOrderExpenseDTO = z.infer<typeof updateOrderExpenseSchema>;
 
 // Interfaces de resposta
-export interface OrderItemResponseDTO {
-  id: string;
-  productId?: string;
-  productName: string;
-  productCode: string;
-  quantity: number;
-  unitPrice: number;
-  discount: number;
-  discountType: 'FIXED' | 'PERCENTAGE';
-  subtotal: number;
-  total: number;
-  observations?: string;
-}
+export const orderItemResponseDto = z.object({
+  id: z.string(),
+  productId: z.string().optional(),
+  productName: z.string(),
+  productCode: z.string(),
+  quantity: z.number(),
+  unitPrice: z.number(),
+  discount: z.number(),
+  discountType: z.enum(['FIXED', 'PERCENTAGE']),
+  subtotal: z.number(),
+  total: z.number(),
+  observations: z.string().optional(),
+});
+export type OrderItemResponseDTO = z.infer<typeof orderItemResponseDto>;
 
-export interface OrderTimeTrackingResponseDTO {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  startTime: Date;
-  endTime?: Date;
-  duration?: number; // em minutos
-  description?: string;
-  billable: boolean;
-  createdAt: Date;
-}
+export const orderTimeTrackingResponseDto = z.object({
+  id: z.string(),
+  employeeId: z.string(),
+  employeeName: z.string(),
+  startTime: z.date(),
+  endTime: z.date().optional(),
+  duration: z.number().optional(), // em minutos
+  description: z.string().optional(),
+  billable: z.boolean(),
+  createdAt: z.date(),
+});
+export type OrderTimeTrackingResponseDTO = z.infer<typeof orderTimeTrackingResponseDto>;
 
-export interface OrderExpenseResponseDTO {
-  id: string;
-  description: string;
-  amount: number;
-  category?: string;
-  date: Date;
-  receipt?: string;
-  billable: boolean;
-  createdAt: Date;
-}
+export const orderExpenseResponseDto = z.object({
+  id: z.string(),
+  description: z.string(),
+  amount: z.number(),
+  category: z.string().optional(),
+  date: z.date(),
+  receipt: z.string().optional(),
+  billable: z.boolean(),
+  createdAt: z.date(),
+});
+export type OrderExpenseResponseDTO = z.infer<typeof orderExpenseResponseDto>;
 
-export interface OrderResponseDTO {
-  id: string;
-  number: string;
-  quoteId?: string;
-  quoteNumber?: string;
-  partnerId: string;
-  partnerName: string;
-  partnerDocument: string;
-  title: string;
-  description?: string;
-  status: 'PENDING' | 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
-  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-  expectedStartDate?: Date;
-  expectedEndDate?: Date;
-  actualStartDate?: Date;
-  actualEndDate?: Date;
-  paymentTerms?: string;
-  observations?: string;
-  discount: number;
-  discountType: 'FIXED' | 'PERCENTAGE';
-  subtotal: number;
-  discountValue: number;
-  totalValue: number;
-  assignedTo?: string;
-  assignedToName?: string;
-  items: OrderItemResponseDTO[];
-  timeTracking: OrderTimeTrackingResponseDTO[];
-  expenses: OrderExpenseResponseDTO[];
-  totalHours: number;
-  totalExpenses: number;
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string;
-  createdByName: string;
-}
+export const orderResponseDto = z.object({
+  id: z.string(),
+  number: z.string(),
+  quoteId: z.string().optional(),
+  quoteNumber: z.string().optional(),
+  partnerId: z.string(),
+  partnerName: z.string(),
+  partnerDocument: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  status: z.enum(['PENDING', 'IN_PROGRESS', 'PAUSED', 'COMPLETED', 'CANCELLED']),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
+  expectedStartDate: z.date().optional(),
+  expectedEndDate: z.date().optional(),
+  actualStartDate: z.date().optional(),
+  actualEndDate: z.date().optional(),
+  paymentTerms: z.string().optional(),
+  observations: z.string().optional(),
+  discount: z.number(),
+  discountType: z.enum(['FIXED', 'PERCENTAGE']),
+  subtotal: z.number(),
+  discountValue: z.number(),
+  totalValue: z.number(),
+  assignedTo: z.string().optional(),
+  assignedToName: z.string().optional(),
+  items: z.array(orderItemResponseDto),
+  timeTracking: z.array(orderTimeTrackingResponseDto),
+  expenses: z.array(orderExpenseResponseDto),
+  totalHours: z.number(),
+  totalExpenses: z.number(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  createdBy: z.string(),
+  createdByName: z.string(),
+});
+export type OrderResponseDTO = z.infer<typeof orderResponseDto>;
 
 // Interface para estatísticas
-export interface OrderStatsDTO {
-  total: number;
-  byStatus: {
-    pending: number;
-    inProgress: number;
-    paused: number;
-    completed: number;
-    cancelled: number;
-  };
-  byPriority: {
-    low: number;
-    medium: number;
-    high: number;
-    urgent: number;
-  };
-  totalValue: number;
-  averageValue: number;
-  averageCompletionTime: number; // em dias
-  thisMonth: {
-    total: number;
-    totalValue: number;
-    completed: number;
-    completedValue: number;
-  };
-  lastMonth: {
-    total: number;
-    totalValue: number;
-    completed: number;
-    completedValue: number;
-  };
-  overdue: number;
-  totalHours: number;
-  totalExpenses: number;
-}
+export const orderStatsDto = z.object({
+  total: z.number(),
+  byStatus: z.object({
+    pending: z.number(),
+    inProgress: z.number(),
+    paused: z.number(),
+    completed: z.number(),
+    cancelled: z.number(),
+  }),
+  byPriority: z.object({
+    low: z.number(),
+    medium: z.number(),
+    high: z.number(),
+    urgent: z.number(),
+  }),
+  totalValue: z.number(),
+  averageValue: z.number(),
+  averageCompletionTime: z.number(), // em dias
+  thisMonth: z.object({
+    total: z.number(),
+    totalValue: z.number(),
+    completed: z.number(),
+    completedValue: z.number(),
+  }),
+  lastMonth: z.object({
+    total: z.number(),
+    totalValue: z.number(),
+    completed: z.number(),
+    completedValue: z.number(),
+  }),
+  overdue: z.number(),
+  totalHours: z.number(),
+  totalExpenses: z.number(),
+});
+export type OrderStatsDTO = z.infer<typeof orderStatsDto>;
 
 // Interface para relatório
-export interface OrderReportDTO {
-  id: string;
-  number: string;
-  customerName: string;
-  customerDocument: string;
-  title: string;
-  status: string;
-  priority: string;
-  expectedStartDate?: string;
-  expectedEndDate?: string;
-  actualStartDate?: string;
-  actualEndDate?: string;
-  subtotal: number;
-  discountValue: number;
-  totalValue: number;
-  totalHours: number;
-  totalExpenses: number;
-  itemsCount: number;
-  assignedToName?: string;
-  createdAt: string;
-  createdByName: string;
-}
+export const orderReportDto = z.object({
+  id: z.string(),
+  number: z.string(),
+  customerName: z.string(),
+  customerDocument: z.string(),
+  title: z.string(),
+  status: z.string(),
+  priority: z.string(),
+  expectedStartDate: z.string().optional(),
+  expectedEndDate: z.string().optional(),
+  actualStartDate: z.string().optional(),
+  actualEndDate: z.string().optional(),
+  subtotal: z.number(),
+  discountValue: z.number(),
+  totalValue: z.number(),
+  totalHours: z.number(),
+  totalExpenses: z.number(),
+  itemsCount: z.number(),
+  assignedToName: z.string().optional(),
+  createdAt: z.string(),
+  createdByName: z.string(),
+});
+export type OrderReportDTO = z.infer<typeof orderReportDto>;
 
 // Interface para dashboard
-export interface OrderDashboardDTO {
-  stats: OrderStatsDTO;
-  recentOrders: OrderResponseDTO[];
-  overdueOrders: OrderResponseDTO[];
-  upcomingDeadlines: OrderResponseDTO[];
-  topCustomers: {
-    customerId: string;
-    customerName: string;
-    ordersCount: number;
-    totalValue: number;
-  }[];
-  productivityMetrics: {
-    averageHoursPerOrder: number;
-    averageExpensesPerOrder: number;
-    completionRate: number;
-    onTimeDeliveryRate: number;
-  };
-}
+export const orderDashboardDto = z.object({
+  stats: orderStatsDto,
+  recentOrders: z.array(orderResponseDto),
+  overdueOrders: z.array(orderResponseDto),
+  upcomingDeadlines: z.array(orderResponseDto),
+  topCustomers: z.array(z.object({
+    customerId: z.string(),
+    customerName: z.string(),
+    ordersCount: z.number(),
+    totalValue: z.number(),
+  })),
+  productivityMetrics: z.object({
+    averageHoursPerOrder: z.number(),
+    averageExpensesPerOrder: z.number(),
+    completionRate: z.number(),
+    onTimeDeliveryRate: z.number(),
+  }),
+});
+export type OrderDashboardDTO = z.infer<typeof orderDashboardDto>;

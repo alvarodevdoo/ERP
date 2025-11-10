@@ -20,7 +20,7 @@ import {
   UpdateOrderExpenseDTO
 } from '../dtos';
 import { OrderService } from '../services';
-import { requirePermission, authMiddleware } from '../../../shared/middlewares/auth';
+import { requirePermission } from '../../../shared/middlewares/auth';
 import { createValidation, commonSchemas } from '../../../shared/middlewares/validation';
 import { extractTenant } from '../../../shared/middlewares/tenant';
 
@@ -30,7 +30,7 @@ export async function orderRoutes(fastify: FastifyInstance) {
   const orderService = new OrderService(fastify.prisma);
 
   // 
-  // Middleware para todas as rotas  fastify.addHook('preHandler', authMiddleware);
+  // Middleware para todas as rotas  fastify.addHook('preHandler', authPreHandler);
   fastify.addHook('preHandler', extractTenant);
 
   /**

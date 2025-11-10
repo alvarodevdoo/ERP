@@ -124,6 +124,8 @@ export class ProductService {
     userId: string
   ): Promise<ProductListResponseDto> {
     await this.validatePermission(userId, companyId, 'products', 'read');
+    
+    console.log('ProductService.findMany - Filters received:', JSON.stringify(filters, null, 2)); // NEW DEBUG LOG
 
     const result = await this.productRepository.findMany(filters, companyId);
     return result;

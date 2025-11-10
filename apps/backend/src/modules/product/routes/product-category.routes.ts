@@ -7,8 +7,8 @@ import {
   updateProductCategoryDto
 } from '../dtos';
 import { ProductCategoryService } from '../services';
-import { authMiddleware } from '../../../shared/middlewares/auth';
-import { tenantMiddleware } from '../../../shared/middlewares/tenant';
+import { authPreHandler } from '../../../shared/middlewares/auth';
+import { tenantPreHandler } from '../../../shared/middlewares/tenant';
 import { createValidation } from '../../../shared/middlewares/validation';
 
 // Função auxiliar para tratamento de erros
@@ -28,9 +28,6 @@ export async function productCategoryRoutes(fastify: FastifyInstance) {
   const prisma = new PrismaClient();
   const categoryService = new ProductCategoryService(prisma);
 
-  // Aplicar middlewares globais
-  await fastify.register(authMiddleware);
-  await fastify.register(tenantMiddleware);
 
   /**
    * Criar categoria

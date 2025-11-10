@@ -20,16 +20,16 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    port: 3060,
     host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3050',
         changeOrigin: true,
         secure: false,
       },
       '/socket.io': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3050',
         changeOrigin: true,
         ws: true,
       },

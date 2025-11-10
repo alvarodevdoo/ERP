@@ -13,7 +13,7 @@ import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
 
 // Dashboard Pages
 import { DashboardPage } from '@/pages/dashboard/DashboardPage'
-import { ProductsPage } from '@/pages/products/ProductsPage'
+import ProductsPage from '@/pages/products/ProductsPage'
 import { QuotesPage } from '@/pages/quotes/QuotesPage'
 import { OrdersPage } from '@/pages/orders/OrdersPage'
 import { StockPage } from '@/pages/stock/StockPage'

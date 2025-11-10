@@ -6,12 +6,13 @@ import multipart from '@fastify/multipart';
 import sensible from '@fastify/sensible';
 import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
+
+import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { config } from './config';
 import { prisma } from './database/client';
 import { errorHandler } from './shared/middlewares/error-handler';
-import { authMiddleware } from './shared/middlewares/auth';
-import { tenantMiddleware } from './shared/middlewares/tenant';
-import { validationMiddleware } from './shared/middlewares/validation';
+import { authPreHandler } from './shared/middlewares/auth';
+import { tenantPreHandler } from './shared/middlewares/tenant';
 
 // Import routes
 import { authRoutes } from './modules/auth/routes';
@@ -19,13 +20,14 @@ import { companyRoutes } from './modules/company/routes';
 import { userRoutes } from './modules/user/routes';
 import { roleRoutes } from './modules/role/routes';
 import { employeeRoutes } from './modules/employee/routes';
-import { productRoutes } from './modules/product/routes';
+import { productRoutes, productCategoryRoutes } from './modules/product/routes';
 import { partnerRoutes } from './modules/partner/routes';
 import { quoteRoutes } from './modules/quote/routes';
 import { orderRoutes } from './modules/order/routes';
 import { stockRoutes } from './modules/stock/routes';
 import { financialRoutes } from './modules/financial/routes';
 // import { uploadRoutes } from './modules/upload/routes';
+
 
 const server = Fastify({
   logger: {
@@ -39,17 +41,24 @@ const server = Fastify({
       },
     },
   },
-});
+}).withTypeProvider<ZodTypeProvider>();
+
+// Removemos os compiladores de Zod para evitar conflitos de runtime
+// com schemas JSON e middlewares de validação. As rotas que usam Zod
+// devem validar via preHandler.
 
 // Register plugins
-server.register(sensible)
+server.register(sensible);
 server.register(helmet, {
   contentSecurityPolicy: false,
 });
 
 server.register(cors, {
-  origin: config.CORS_ORIGIN,
+  origin: config.CORS_ORIGIN.includes(',')
+    ? config.CORS_ORIGIN.split(',')
+    : config.CORS_ORIGIN,
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
 });
 
 server.register(rateLimit, {
@@ -63,11 +72,16 @@ server.register(multipart, {
   },
 });
 
-// Register global middlewares
-server.register(errorHandler);
-server.register(authMiddleware);
-server.register(tenantMiddleware);
-server.register(validationMiddleware);
+// Decorate request object globally
+server.decorateRequest('user', undefined);
+server.decorateRequest('userId', '');
+server.decorateRequest('companyId', '');
+server.decorateRequest('products', '');
+
+// Decorate server with prisma - must be done before registering routes
+if (!server.hasDecorator('prisma')) {
+  server.decorate('prisma', prisma);
+}
 
 // Swagger / OpenAPI documentation
 server.register(swagger, {
@@ -100,9 +114,14 @@ server.register(swaggerUI, {
     docExpansion: 'list',
     deepLinking: true,
   },
-  staticCSP: true,
+  staticCSP: false,
+  transformStaticCSP: (header) => header,
 });
 
+// Register global middlewares
+  server.register(errorHandler);
+  server.addHook('preHandler', authPreHandler);
+  server.addHook('preHandler', tenantPreHandler);
 // Health check
 server.get('/health', async () => {
   try {
@@ -117,15 +136,16 @@ server.get('/health', async () => {
 // Register routes
 server.register(authRoutes, { prefix: '/api/auth' });
 server.register(companyRoutes, { prefix: '/api/companies' });
-server.register(userRoutes, { prefix: '/api/users' });
-server.register(roleRoutes, { prefix: '/api/roles' });
-server.register(employeeRoutes, { prefix: '/api/employees' });
+// server.register(userRoutes, { prefix: '/api/users' });
+// server.register(roleRoutes, { prefix: '/api/roles' });
+// server.register(employeeRoutes, { prefix: '/api/employees' });
 server.register(productRoutes, { prefix: '/api/products' });
-server.register(partnerRoutes, { prefix: '/api/partners' });
-server.register(quoteRoutes, { prefix: '/api/quotes' });
-server.register(orderRoutes, { prefix: '/api/orders' });
-server.register(stockRoutes, { prefix: '/api/stock' });
-server.register(financialRoutes, { prefix: '/api/financial' });
+server.register(productCategoryRoutes, { prefix: '/api/product-categories' });
+// server.register(partnerRoutes, { prefix: '/api/partners' });
+// server.register(quoteRoutes, { prefix: '/api/quotes' });
+// server.register(orderRoutes, { prefix: '/api/orders' });
+// server.register(stockRoutes, { prefix: '/api/stock' });
+// server.register(financialRoutes, { prefix: '/api/financial' });
 // server.register(uploadRoutes, { prefix: '/api/upload' });
 
 // Graceful shutdown

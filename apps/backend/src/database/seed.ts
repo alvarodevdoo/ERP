@@ -2,7 +2,10 @@ import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import dotenv from 'dotenv'
 import path from 'path'
+import { fileURLToPath } from 'url'
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 dotenv.config({ path: path.resolve(__dirname, '../../.env') })
 
 const prisma = new PrismaClient()
@@ -30,6 +33,9 @@ async function main() {
 
   // Criar permissões básicas
   const permissions = [
+    // Empresas
+    { name: 'Visualizar Empresas', action: 'read', resource: 'companies' },
+    { name: 'Criar Empresas', action: 'write', resource: 'companies' },
     { name: 'Visualizar Usuários', action: 'read', resource: 'users' },
     { name: 'Criar Usuários', action: 'write', resource: 'users' },
     { name: 'Excluir Usuários', action: 'delete', resource: 'users' },
@@ -66,7 +72,11 @@ async function main() {
   const adminPermissionIds = createdPermissions.map(p => p.id)
   const adminRole = await prisma.role.upsert({
     where: { name_companyId: { name: 'Administrador', companyId: company.id } },
-    update: {},
+    update: {
+      permissions: {
+        connect: adminPermissionIds.map(id => ({ id }))
+      }
+    },
     create: {
       name: 'Administrador',
       description: 'Acesso total ao sistema',
@@ -88,7 +98,11 @@ async function main() {
 
   await prisma.role.upsert({
     where: { name_companyId: { name: 'Vendedor', companyId: company.id } },
-    update: {},
+    update: {
+      permissions: {
+        connect: vendorPermissionIds.map(id => ({ id }))
+      }
+    },
     create: {
       name: 'Vendedor',
       description: 'Acesso a vendas e orçamentos',

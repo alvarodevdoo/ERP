@@ -33,7 +33,7 @@ export class AuthService {
 
   constructor(prisma: PrismaClient, authRepository?: AuthRepository) {
     this.prisma = prisma;
-    this.authRepository = authRepository || new AuthRepository();
+    this.authRepository = authRepository || new AuthRepository(this.prisma);
     this.roleRepository = new RoleRepository(this.prisma);
   }
   async login(data: LoginDto): Promise<LoginResponseDto> {

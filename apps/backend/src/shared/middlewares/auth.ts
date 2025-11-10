@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyRequest } from 'fastify';
+import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import jwt from 'jsonwebtoken';
 import { config } from '../../config';
 import { prisma } from '../../database/client';
@@ -43,76 +43,92 @@ interface JwtPayload {
   exp: number;
 }
 
-export async function authMiddleware(fastify: FastifyInstance) {
-  fastify.decorateRequest('user', undefined);
-  fastify.decorateRequest('userId', '');
+export async function authPreHandler(request: FastifyRequest, reply: FastifyReply) {
+  console.log('Auth PreHandler running for URL:', request.url); // My debug log
+  // Skip auth for public routes
+  const publicRoutes = [
+    '/health',
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/refresh',
+    '/api/auth/forgot-password',
+    '/api/auth/reset-password',
+  ];
 
-  fastify.addHook('preHandler', async (request: FastifyRequest) => {
-    // Skip auth for public routes
-    const publicRoutes = [
-      '/health',
-      '/api/auth/login',
-      '/api/auth/register',
-      '/api/auth/refresh',
-      '/api/auth/forgot-password',
-      '/api/auth/reset-password',
-    ];
+  // Allow Swagger UI and its assets/spec without auth
+  if (publicRoutes.includes(request.url) || request.url.startsWith('/docs')) {
+    return;
+  }
 
-    if (publicRoutes.includes(request.url)) {
-      return;
+  // Extract token from Authorization header
+  const authHeader = request.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw request.server.httpErrors.unauthorized('Missing or invalid authorization header');
+  }
+
+  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+  try {
+    // Verify JWT token
+    const decoded = jwt.verify(token, config.JWT_SECRET) as JwtPayload;
+    
+    // Verificar se o token está expirado
+    const now = Math.floor(Date.now() / 1000);
+    if (decoded.exp && decoded.exp < now) {
+      throw request.server.httpErrors.unauthorized('Token expirado');
+    }
+    
+    // Get user from database
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      ...userInclude,
+    });
+
+    if (!user) {
+      throw request.server.httpErrors.unauthorized('User not found');
     }
 
-    // Extract token from Authorization header
-    const authHeader = request.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw fastify.httpErrors.unauthorized('Missing or invalid authorization header');
+    if (!user.isActive) {
+      throw request.server.httpErrors.unauthorized('User account is inactive');
     }
 
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-
-    try {
-      // Verify JWT token
-      const decoded = jwt.verify(token, config.JWT_SECRET) as JwtPayload;
-      
-      // Verificar se o token está expirado
-      const now = Math.floor(Date.now() / 1000);
-      if (decoded.exp && decoded.exp < now) {
-        throw fastify.httpErrors.unauthorized('Token expirado');
-      }
-      
-      // Get user from database
-      const user = await prisma.user.findUnique({
-        where: { id: decoded.userId },
-        ...userInclude,
-      });
-
-      if (!user) {
-        throw fastify.httpErrors.unauthorized('User not found');
-      }
-
-      if (!user.isActive) {
-        throw fastify.httpErrors.unauthorized('User account is inactive');
-      }
-
-      // Attach user to request
-      request.user = user as AuthenticatedUser; // Cast para AuthenticatedUser
-      request.userId = user.id;
-    } catch (error) {
-      if (error instanceof jwt.JsonWebTokenError) {
-        throw fastify.httpErrors.unauthorized('Invalid token');
-      }
-      if (error instanceof jwt.TokenExpiredError) {
-        throw fastify.httpErrors.unauthorized('Token expired');
-      }
-      throw error;
+    // Attach user to request
+    request.user = user as AuthenticatedUser;
+    request.userId = user.id;
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      throw request.server.httpErrors.unauthorized('Invalid token');
     }
-  });
+    if (error instanceof jwt.TokenExpiredError) {
+      throw request.server.httpErrors.unauthorized('Token expired');
+    }
+    throw error;
+  }
 }
 
 // Helper function to check if user has permission
 export function hasPermission(user: AuthenticatedUser, permission: string): boolean {
   const perms = user.employee?.role?.permissions ?? [];
-  return perms.some(p => p.name === permission);
+
+  // Support 'resource:action' pattern used in routes
+  if (permission.includes(':')) {
+    const [resource, requestedAction] = permission.split(':');
+
+    // Normalize requested actions to match seeded actions
+    const actionMap: Record<string, string> = {
+      create: 'write',
+      update: 'write',
+      restore: 'write',
+      delete: 'delete',
+      read: 'read',
+    };
+    const normalizedAction = actionMap[requestedAction as keyof typeof actionMap] ?? requestedAction;
+
+    return perms.some(p => p.resource === resource && p.action === normalizedAction && p.isActive);
+  }
+
+  // Fallback: match by human-friendly permission name
+  return perms.some(p => p.name === permission && p.isActive);
 }
 
 // Helper function to check if user has role

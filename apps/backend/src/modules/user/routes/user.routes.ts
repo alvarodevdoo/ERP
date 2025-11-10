@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { UserService } from '../services';
-import { authMiddleware, requirePermission } from '../../../shared/middlewares/auth';
-import { tenantMiddleware } from '../../../shared/middlewares/tenant';
+import { authPreHandler, requirePermission } from '../../../shared/middlewares/auth';
+import { tenantPreHandler } from '../../../shared/middlewares/tenant';
 import { createValidation } from '../../../shared/middlewares/validation';
 import {
   createUserDto,
@@ -23,9 +23,6 @@ import { logger } from '../../../shared/logger/index';
 export async function userRoutes(fastify: FastifyInstance) {
   const userService = new UserService();
 
-  // Aplicar middlewares globais para todas as rotas
-  await fastify.register(authMiddleware);
-  await fastify.register(tenantMiddleware);
 
   /**
    * Criar usuário

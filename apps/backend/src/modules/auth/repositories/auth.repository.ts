@@ -10,8 +10,8 @@ import { logger } from '../../../shared/logger/index';
 export class AuthRepository {
   private db: PrismaClient;
 
-  constructor() {
-    this.db = prisma;
+  constructor(prismaClient?: PrismaClient) {
+    this.db = prismaClient || prisma;
   }
 
   /**

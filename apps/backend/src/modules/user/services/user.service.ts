@@ -10,7 +10,7 @@ import {
   UserListResponseDto,
 } from '../dtos';
 import { AppError } from '../../../shared/errors/AppError';
-import { validateCPF } from '@shared/utils/validators';
+import { validateCPF } from '../../../shared/utils/validators';
 import { User } from '@prisma/client';
 
 /**

@@ -6,8 +6,8 @@ import {
   createStockMovementDto
 } from '../dtos';
 import { StockMovementService } from '../services';
-import { authMiddleware } from '../../../shared/middlewares/auth';
-import { tenantMiddleware } from '../../../shared/middlewares/tenant';
+import { authPreHandler } from '../../../shared/middlewares/auth';
+import { tenantPreHandler } from '../../../shared/middlewares/tenant';
 import { createValidation } from '../../../shared/middlewares/validation';
 
 /**
@@ -30,9 +30,6 @@ export async function stockMovementRoutes(fastify: FastifyInstance) {
   const prisma = new PrismaClient();
   const stockMovementService = new StockMovementService(prisma);
 
-  // Aplicar middlewares globais
-  await fastify.register(authMiddleware);
-  await fastify.register(tenantMiddleware);
 
   /**
    * Criar movimentação de estoque

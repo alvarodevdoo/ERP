@@ -2,7 +2,7 @@ import { CompanyRepository } from '../repositories';
 import { CreateCompanyDto, UpdateCompanyDto, CompanyFiltersDto, CompanyResponseDto, CompanyListResponseDto } from '../dtos';
 import { logger } from '../../../shared/logger/index';
 import { AppError } from '../../../shared/errors/AppError';
-import { validateCNPJ } from '@shared/utils/validators';
+import { validateCNPJ } from '../../../shared/utils/validators';
 
 /**
  * Service para operações de empresa

@@ -4,8 +4,7 @@ import { z } from 'zod';
  * DTO para criação de usuário
  */
 export const createUserDto = z.object({
-  name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres').max(100, 'Nome deve ter no máximo 100 caracteres'),
-  email: z.string().email('Email inválido'),
+  email: z.string().email().describe({ example: 'newuser@example.com' } as const),
   password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres').max(100, 'Senha deve ter no máximo 100 caracteres'),
   companyId: z.string().uuid('ID da empresa inválido'),
   isActive: z.boolean().default(true),
@@ -16,7 +15,7 @@ export const createUserDto = z.object({
  */
 export const updateUserDto = z.object({
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres').max(100, 'Nome deve ter no máximo 100 caracteres').optional(),
-  email: z.string().email('Email inválido').optional(),
+  email: z.string().email().optional().describe({ example: 'updateuser@example.com' } as const),
   isActive: z.boolean().optional(),
 });
 
@@ -37,7 +36,7 @@ export const changePasswordDto = z.object({
  */
 export const userFiltersDto = z.object({
   name: z.string().optional(),
-  email: z.string().optional(),
+  email: z.string().optional().describe({ example: 'filteruser@example.com' } as const),
   companyId: z.string().uuid('ID da empresa inválido').optional(),
   isActive: z.boolean().optional(),
   page: z.number().int().min(1, 'Página deve ser maior que 0').default(1),
@@ -52,7 +51,7 @@ export const userFiltersDto = z.object({
 export const userResponseDto = z.object({
   id: z.string().uuid(),
   name: z.string(),
-  email: z.string().email(),
+  email: z.string().email().describe({ example: 'user@example.com' } as const),
   isActive: z.boolean(),
   createdAt: z.date(),
   updatedAt: z.date(),

@@ -1,137 +1,147 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { z, ZodSchema, ZodError } from 'zod';
+/**
+ * Middleware de validação para rotas Fastify
+ * Valida body, querystring, params e headers usando Zod schemas
+ */
 
-interface ValidationSchemas {
+import { FastifyRequest, FastifyReply, HookHandlerDoneFunction } from 'fastify';
+import { z, ZodSchema, ZodError, ZodIssue } from 'zod';
+
+/**
+ * Interface para configuração de validação
+ */
+export interface ValidationConfig {
   body?: ZodSchema;
-  params?: ZodSchema;
   querystring?: ZodSchema;
+  params?: ZodSchema;
   headers?: ZodSchema;
 }
 
-export async function validationMiddleware(fastify: FastifyInstance) {
-  // Register validation decorator
-  fastify.decorate('validate', (schemas: ValidationSchemas) => {
-    // 
-    return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-      try {
-        // Validate request body
-        if (schemas.body && request.body) {
-          request.body = schemas.body.parse(request.body);
-        }
-
-        // Validate route parameters
-        if (schemas.params && request.params) {
-          request.params = schemas.params.parse(request.params);
-        }
-
-        // Validate query string
-        if (schemas.querystring && request.query) {
-          request.query = schemas.querystring.parse(request.query);
-        }
-
-        // Validate headers (do not reassign request.headers, just parse to validate)
-        if (schemas.headers && request.headers) {
-          schemas.headers.parse(request.headers);
-        }
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          reply.status(400).send({
-            error: 'Validation Error',
-            message: 'Invalid request data',
-            details: error.issues.map(err => ({
-              field: err.path.join('.'),
-              message: err.message,
-              code: err.code,
-            })),
-          });
-          return;
-        }
-        throw error;
-      }
-    };
-  });
+// Custom type guard for ZodError with errors property
+function isZodErrorWithIssues(error: any): error is ZodError {
+  return error instanceof ZodError && Array.isArray((error as any).errors);
 }
 
-// Common validation schemas
-export const commonSchemas = {
-  // Pagination
-  pagination: z.object({
-    page: z.string().optional().default('1').transform(Number),
-    limit: z.string().optional().default('10').transform(Number),
-    search: z.string().optional(),
-    sortBy: z.string().optional(),
-    sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
-  }),
-
-  // ID parameter
-  idParam: z.object({
-    id: z.string().uuid('Invalid ID format'),
-  }),
-
-  // Date range
-  dateRange: z.object({
-    startDate: z.string().datetime().optional(),
-    endDate: z.string().datetime().optional(),
-  }),
-
-  // File upload
-  fileUpload: z.object({
-    filename: z.string().min(1, 'Filename is required'),
-    mimetype: z.string().min(1, 'MIME type is required'),
-    size: z.number().positive('File size must be positive'),
-  }),
-};
-
-// Helper function to create validation middleware
-export function createValidation(schemas: ValidationSchemas) {
-  // 
-  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+/**
+ * Cria um middleware de validação para uso em rotas Fastify
+ * @param config Configuração de validação com schemas Zod
+ * @returns Middleware de validação
+ */
+export function createValidation(config: ValidationConfig) {
+  return async (
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<void> => {
     try {
-      // Validate request body
-      if (schemas.body && request.body) {
-        request.body = schemas.body.parse(request.body);
+      // Validar body
+      if (config.body && request.body !== undefined) {
+        const validatedBody = config.body.parse(request.body);
+        request.body = validatedBody;
       }
 
-      // Validate route parameters
-      if (schemas.params && request.params) {
-        request.params = schemas.params.parse(request.params);
+      // Validar querystring
+      if (config.querystring && request.query !== undefined) {
+        const validatedQuery = config.querystring.parse(request.query);
+        request.query = validatedQuery;
       }
 
-      // Validate query string
-      if (schemas.querystring && request.query) {
-        request.query = schemas.querystring.parse(request.query);
+      // Validar params
+      if (config.params && request.params !== undefined) {
+        const validatedParams = config.params.parse(request.params);
+        request.params = validatedParams;
       }
 
-      // Validate headers (do not reassign request.headers, just parse to validate)
-      if (schemas.headers && request.headers) {
-        schemas.headers.parse(request.headers);
+      // Validar headers
+      if (config.headers && request.headers !== undefined) {
+        const validatedHeaders = config.headers.parse(request.headers);
+        // Headers são imutáveis no Fastify, então apenas validamos
+        // Não os substituímos no request
       }
-    } catch (error: unknown) {
-      if (error instanceof z.ZodError) {
-        reply.status(400).send({
+    } catch (error) {
+      request.log.error({ error }, 'Validation Error caught:'); // NEW DEBUG LOG
+      if (isZodErrorWithIssues(error)) {
+        reply.code(400).send({
           success: false,
           message: 'Erro de validação',
-          errors: error.issues.map(err => ({
-            path: err.path.join('.'),
+          errors: (error as any).errors.map((err: ZodIssue) => ({
+            field: err.path.join('.'),
             message: err.message
           }))
         });
-        return;
+        throw error;
+      } else if (
+        error &&
+        typeof error === 'object' &&
+        'errors' in error &&
+        Array.isArray((error as any).errors) // Use any to bypass type checking for the check
+      ) {
+        // Fallback for cases where ZodError might be wrapped or not fully recognized
+        reply.code(400).send({
+          success: false,
+          message: 'Erro de validação',
+          errors: (error as any).errors.map((err: ZodIssue) => ({
+            field: err.path.join('.'),
+            message: err.message
+          }))
+        });
+        throw error;
       }
       
-      reply.status(500).send({
-        success: false,
-        message: 'Erro interno de validação',
-        error: error instanceof Error ? error.message : 'Erro desconhecido'
-      });
-      return;
+      // Para outros tipos de erro, lançamos o erro para o error handler global
+      throw error;
     }
   };
 }
 
-// Extend Fastify instance type
-declare module 'fastify' {
-  interface FastifyInstance {
-    validate: (schemas: ValidationSchemas) => (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
-  }
-}
+/**
+ * Schemas comuns reutilizáveis
+ */
+export const commonSchemas = {
+  /**
+   * Schema para paginação
+   */
+  pagination: z.object({
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(10)
+  }),
+
+  /**
+   * Schema para ID de recurso
+   */
+  idParam: z.object({
+    id: z.string().uuid()
+  }),
+
+  /**
+   * Schema para busca/filtro
+   */
+  search: z.object({
+    search: z.string().optional(),
+    sortBy: z.string().optional(),
+    sortOrder: z.enum(['asc', 'desc']).optional().default('asc')
+  }),
+
+  /**
+   * Schema para datas de filtro
+   */
+  dateRange: z.object({
+    startDate: z.coerce.date().optional(),
+    endDate: z.coerce.date().optional()
+  }).refine(
+    (data) => {
+      if (data.startDate && data.endDate) {
+        return data.startDate <= data.endDate;
+      }
+      return true;
+    },
+    {
+      message: 'A data inicial deve ser menor ou igual à data final'
+    }
+  ),
+
+  /**
+   * Schema para status booleano
+   */
+  status: z.object({
+    status: z.enum(['active', 'inactive', 'all']).optional().default('all')
+  })
+};

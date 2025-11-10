@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // Validadores básicos
-export const emailSchema = z.string().email('Email inválido');
+export const emailSchema = z.string().email();
 export const phoneSchema = z.string().min(10, 'Telefone deve ter pelo menos 10 dígitos');
 export const cnpjSchema = z.string().length(14, 'CNPJ deve ter 14 dígitos');
 export const cpfSchema = z.string().length(11, 'CPF deve ter 11 dígitos');

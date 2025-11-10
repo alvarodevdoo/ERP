@@ -7,8 +7,8 @@ import {
   updatePartnerContactSchema
 } from '../dtos';
 import { PartnerContactService } from '../services';
-import { authMiddleware } from '../../../shared/middlewares/auth';
-import { tenantMiddleware } from '../../../shared/middlewares/tenant';
+import { authPreHandler } from '../../../shared/middlewares/auth';
+import { tenantPreHandler } from '../../../shared/middlewares/tenant';
 import { createValidation } from '../../../shared/middlewares/validation';
 import { AppError } from '../../../shared/errors/AppError';
 
@@ -16,9 +16,6 @@ export async function partnerContactRoutes(fastify: FastifyInstance) {
   const prisma = new PrismaClient();
   const partnerContactService = new PartnerContactService(prisma);
 
-  // Middleware de autenticação e tenant para todas as rotas
-  await fastify.register(authMiddleware);
-  await fastify.register(tenantMiddleware);
 
   /**
    * Criar contato do parceiro

@@ -1,9 +1,8 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-// Login DTOs
 export const loginDto = z.object({
-  email: z.string().email('Invalid email format'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  email: z.string().nonempty('Email is required').min(6, 'Email must be at least 6 characters'),
+  password: z.string().min(6, "Password must be at least 6 characters").nonempty('Password is required'),
 });
 
 export const loginResponseDto = z.object({
@@ -39,8 +38,9 @@ export const registerDto = z.object({
   
   // User data
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email format'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+      email: z.string(),  
+      password: z.string().min(6, "Password must be at least 6 characters")
+             .describe("Senha com no mínimo 6 caracteres"),
   confirmPassword: z.string(),
 }).refine(data => data.password === data.confirmPassword, {
   message: 'Passwords do not match',
@@ -84,7 +84,7 @@ export const refreshTokenResponseDto = z.object({
 
 // Forgot password DTOs
 export const forgotPasswordDto = z.object({
-  email: z.string().email('Invalid email format'),
+  email: z.string(),
 });
 
 // Reset password DTOs
@@ -110,7 +110,34 @@ export const changePasswordDto = z.object({
 // Profile update DTOs
 export const updateProfileDto = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').optional(),
-  email: z.string().email('Invalid email format').optional(),
+  email: z.string(),
+});
+
+export const meResponseDto = z.object({
+  user: z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string(),
+    companyId: z.string(),
+    company: z.object({
+      id: z.string(),
+      name: z.string(),
+      cnpj: z.string(),
+    }),
+    employee: z
+      .object({
+        id: z.string(),
+        role: z
+          .object({
+            id: z.string(),
+            name: z.string(),
+          })
+          .nullable(),
+      })
+      .nullable(),
+    isActive: z.boolean(),
+    createdAt: z.date(),
+  }),
 });
 
 // Type exports

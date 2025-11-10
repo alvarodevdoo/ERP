@@ -1,6 +1,5 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyRequest } from 'fastify';
 import { AuthService } from '../services/auth.service';
-import { createValidation } from '../../../shared/middlewares/validation';
 import {
   loginDto,
   registerDto,
@@ -17,206 +16,239 @@ import {
   ChangePasswordDto,
   UpdateProfileDto,
 } from '../dtos';
+import { toJsonSchema } from '../../../shared/utils/zod-to-json-schema';
+import { createValidation } from '../../../shared/middlewares/validation';
 
 export async function authRoutes(fastify: FastifyInstance) {
   const authService = new AuthService(fastify.prisma);
+
   // Login
-  fastify.post('/login', {
-    preHandler: createValidation({ body: loginDto }),
-    schema: { tags: ['Auth'], body: loginDto },
-  }, async (request, reply) => {
-    try {
-      const result = await authService.login(request.body as LoginDto);
-      return reply.send(result);
-    } catch (error) {
-      return reply.status(401).send({
-        error: 'Authentication Failed',
-        message: error instanceof Error ? error.message : 'Login failed',
-      });
-    }
-  });
+  fastify.post(
+    '/login',
+    {
+      schema: { 
+        tags: ['Auth'],
+        body: {
+          type: 'object',
+          required: ['email', 'password'],
+          properties: {
+            email: { type: 'string', format: 'email' },
+            password: { type: 'string', minLength: 6 }
+          }
+        }
+      },
+    },
+    async (request: FastifyRequest<{ Body: LoginDto }>, reply) => {
+      try {
+        const result = await authService.login(request.body);
+        return reply.send(result);
+      } catch (error) {
+        return reply.status(401).send({
+          error: 'Authentication Failed',
+          message: error instanceof Error ? error.message : 'Login failed',
+        });
+      }
+    },
+  );
 
   // Register
-  fastify.post('/register', {
-    preHandler: createValidation({ body: registerDto }),
-    schema: { tags: ['Auth'], body: registerDto },
-  }, async (request, reply) => {
-    try {
-      const result = await authService.register(request.body as RegisterDto);
-      return reply.status(201).send(result);
-    } catch (error) {
-      return reply.status(400).send({
-        error: 'Registration Failed',
-        message: error instanceof Error ? error.message : 'Registration failed',
-      });
-    }
-  });
+  fastify.post(
+    '/register',
+    {
+      schema: { tags: ['Auth'], body: toJsonSchema(registerDto) },
+    },
+    async (request: FastifyRequest<{ Body: RegisterDto }>, reply) => {
+      try {
+        const result = await authService.register(request.body);
+        return reply.status(201).send(result);
+      } catch (error) {
+        return reply.status(400).send({
+          error: 'Registration Failed',
+          message:
+            error instanceof Error ? error.message : 'Registration failed',
+        });
+      }
+    },
+  );
 
   // Refresh token
-  fastify.post('/refresh', {
-    preHandler: createValidation({ body: refreshTokenDto }),
-    schema: { tags: ['Auth'], body: refreshTokenDto },
-  }, async (request, reply) => {
-    try {
-      const result = await authService.refreshToken(request.body as RefreshTokenDto);
-      return reply.send(result);
-    } catch (error) {
-      return reply.status(401).send({
-        error: 'Token Refresh Failed',
-        message: error instanceof Error ? error.message : 'Token refresh failed',
-      });
-    }
-  });
+  fastify.post(
+    '/refresh',
+    {
+      schema: { tags: ['Auth'], body: toJsonSchema(refreshTokenDto) },
+    },
+    async (request: FastifyRequest<{ Body: RefreshTokenDto }>, reply) => {
+      try {
+        const result = await authService.refreshToken(request.body);
+        return reply.send(result);
+      } catch (error) {
+        return reply.status(401).send({
+          error: 'Token Refresh Failed',
+          message:
+            error instanceof Error ? error.message : 'Token refresh failed',
+        });
+      }
+    },
+  );
 
   // Forgot password
-  fastify.post('/forgot-password', {
-    preHandler: createValidation({ body: forgotPasswordDto }),
-    schema: { tags: ['Auth'], body: forgotPasswordDto },
-  }, async (request, reply) => {
-    try {
-      await authService.forgotPassword(request.body as ForgotPasswordDto);
-      return reply.send({
-        message: 'If the email exists, a password reset link has been sent',
-      });
-    } catch (_error) {
+  fastify.post(
+    '/forgot-password',
+    {
+      schema: { tags: ['Auth'], body: toJsonSchema(forgotPasswordDto) },
+    },
+    async (request: FastifyRequest<{ Body: ForgotPasswordDto }>, reply) => {
+      try {
+        await authService.forgotPassword(request.body);
+        return reply.send({
+          message: 'If the email exists, a password reset link has been sent',
+        });
+      } catch (_error) {
         return reply.status(500).send({
           error: 'Password Reset Failed',
           message: 'Unable to process password reset request',
         });
       }
-  });
+    },
+  );
 
   // Reset password
-  fastify.post('/reset-password', {
-    preHandler: createValidation({ body: resetPasswordDto }),
-    schema: { tags: ['Auth'], body: resetPasswordDto },
-  }, async (request, reply) => {
-    try {
-      await authService.resetPassword(request.body as ResetPasswordDto);
-      return reply.send({
-        message: 'Password has been reset successfully',
-      });
-    } catch (error) {
-      return reply.status(400).send({
-        error: 'Password Reset Failed',
-        message: error instanceof Error ? error.message : 'Password reset failed',
-      });
-    }
-  });
+  fastify.post(
+    '/reset-password',
+    {
+      schema: { tags: ['Auth'], body: toJsonSchema(resetPasswordDto) },
+    },
+    async (request: FastifyRequest<{ Body: ResetPasswordDto }>, reply) => {
+      try {
+        await authService.resetPassword(request.body);
+        return reply.send({
+          message: 'Password has been reset successfully',
+        });
+      } catch (error) {
+        return reply.status(400).send({
+          error: 'Password Reset Failed',
+          message:
+            error instanceof Error ? error.message : 'Password reset failed',
+        });
+      }
+    },
+  );
 
   // Change password (authenticated)
-  fastify.post('/change-password', {
-    preHandler: createValidation({ body: changePasswordDto }),
-    schema: { tags: ['Auth'], body: changePasswordDto },
-  }, async (request, reply) => {
-    try {
-      if (!request.userId) {
-        return reply.status(401).send({
-          error: 'Authentication Required',
-          message: 'You must be logged in to change password',
+  fastify.post(
+    '/change-password',
+    {
+      schema: { tags: ['Auth'], body: toJsonSchema(changePasswordDto) },
+    },
+    async (request: FastifyRequest<{ Body: ChangePasswordDto }>, reply) => {
+      try {
+        if (!request.userId) {
+          return reply.status(401).send({
+            error: 'Authentication Required',
+            message: 'You must be logged in to change password',
+          });
+        }
+
+        await authService.changePassword(request.userId, request.body);
+        return reply.send({
+          message: 'Password changed successfully',
+        });
+      } catch (error) {
+        return reply.status(400).send({
+          error: 'Password Change Failed',
+          message:
+            error instanceof Error ? error.message : 'Password change failed',
         });
       }
-
-      await authService.changePassword(request.userId, request.body as ChangePasswordDto);
-      return reply.send({
-        message: 'Password changed successfully',
-      });
-    } catch (error) {
-      return reply.status(400).send({
-        error: 'Password Change Failed',
-        message: error instanceof Error ? error.message : 'Password change failed',
-      });
-    }
-  });
+    },
+  );
 
   // Update profile (authenticated)
-  fastify.put('/profile', {
-    preHandler: createValidation({ body: updateProfileDto }),
-    schema: { tags: ['Auth'], body: updateProfileDto },
-  }, async (request, reply) => {
-    try {
-      if (!request.userId) {
-        return reply.status(401).send({
-          error: 'Authentication Required',
-          message: 'You must be logged in to update profile',
+  fastify.put(
+    '/profile',
+    {
+      schema: { tags: ['Auth'], body: toJsonSchema(updateProfileDto) },
+    },
+    async (request: FastifyRequest<{ Body: UpdateProfileDto }>, reply) => {
+      try {
+        if (!request.userId) {
+          return reply.status(401).send({
+            error: 'Authentication Required',
+            message: 'You must be logged in to update profile',
+          });
+        }
+
+        //
+        const user = await authService.updateProfile(
+          request.userId,
+          request.body,
+        );
+        return reply.send({
+          message: 'Profile updated successfully',
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+          },
+        });
+      } catch (error) {
+        return reply.status(400).send({
+          error: 'Profile Update Failed',
+          message:
+            error instanceof Error ? error.message : 'Profile update failed',
         });
       }
-
-      // 
-      const user = await authService.updateProfile(request.userId, request.body as UpdateProfileDto);
-      return reply.send({
-        message: 'Profile updated successfully',
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-        },
-      });
-    } catch (error) {
-      return reply.status(400).send({
-        error: 'Profile Update Failed',
-        message: error instanceof Error ? error.message : 'Profile update failed',
-      });
-    }
-  });
+    },
+  );
 
   // Get current user (authenticated)
-  fastify.get('/me', {
-    schema: { tags: ['Auth'] },
-  }, async (request, reply) => {
-    try {
-      if (!request.user) {
-        return reply.status(401).send({
-          error: 'Authentication Required',
-          message: 'You must be logged in to access this resource',
+  fastify.get(
+    '/me',
+    {
+      schema: { 
+        tags: ['Auth']
+      },
+    },
+    async (request, reply) => {
+      try {
+        if (!request.user) {
+          return reply.status(401).send({
+            error: 'Authentication Required',
+            message: 'You must be logged in to access this resource',
+          });
+        }
+
+        // A resposta será serializada automaticamente com base no meResponseDto
+        return reply.send({ user: request.user });
+
+      } catch (_error) {
+        return reply.status(500).send({
+          error: 'User Fetch Failed',
+          message: 'Unable to fetch user information',
         });
       }
-
-      const user = request.user;
-      const hasEmployee = typeof user === 'object' && user !== null && 'employee' in user;
-
-      return reply.send({
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          companyId: user.companyId,
-          company: user.company,
-          // TODO: Implementar sistema de roles/permissions
-          employee: hasEmployee && (user as any).employee ? {
-            id: (user as any).employee.id,
-            role: (user as any).employee.role ? {
-              id: (user as any).employee.role.id,
-              name: (user as any).employee.role.name,
-            } : null,
-          } : null,
-          isActive: user.isActive,
-          createdAt: user.createdAt,
-        },
-      });
-    } catch (_error) {
-      return reply.status(500).send({
-        error: 'User Fetch Failed',
-        message: 'Unable to fetch user information',
-      });
-    }
-  });
+    },
+  );
 
   // Logout (authenticated)
-  fastify.post('/logout', {
-    schema: { tags: ['Auth'] },
-  }, async (request, reply) => {
-    try {
-      // In a real implementation, you might want to blacklist the token
-      // For now, we'll just return a success message
-      return reply.send({
-        message: 'Logged out successfully',
-      });
-    } catch (_error) {
-      return reply.status(500).send({
-        error: 'Logout Failed',
-        message: 'Unable to logout',
-      });
-    }
-  });
+  fastify.post(
+    '/logout',
+    {
+      schema: { tags: ['Auth'] },
+    },
+    async (request, reply) => {
+      try {
+        // In a real implementation, you might want to blacklist the token
+        // For now, we'll just return a success message
+        return reply.send({
+          message: 'Logged out successfully',
+        });
+      } catch (_error) {
+        return reply.status(500).send({
+          error: 'Logout Failed',
+          message: 'Unable to logout',
+        });
+      }
+    },
+  );
 }

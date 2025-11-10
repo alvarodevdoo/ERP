@@ -14,9 +14,7 @@ export const createCompanyDto = z.object({
     message: 'CNPJ deve ter 14 caracteres',
   }).max(18, 'CNPJ deve ter no máximo 18 caracteres'),
   
-  email: z.string().email({
-    message: 'Email deve ter um formato válido',
-  }).max(100, 'Email deve ter no máximo 100 caracteres'),
+  email: z.string(),
   
   phone: z.string().optional(),
   
@@ -43,7 +41,7 @@ export const updateCompanyDto = z.object({
   
   tradeName: z.string().optional(),
   
-  email: z.string().email('Email deve ter um formato válido').max(100, 'Email deve ter no máximo 100 caracteres').optional(),
+  email: z.string(),
   
   phone: z.string().optional(),
   
@@ -70,7 +68,7 @@ export const updateCompanyDto = z.object({
 export const companyFiltersDto = z.object({
   name: z.string().optional(),
   cnpj: z.string().optional(),
-  email: z.string().optional(),
+  email: z.string().optional().describe('contato@empresa.com'),
   city: z.string().optional(),
   state: z.string().optional(),
   isActive: z.boolean().optional(),
@@ -88,7 +86,7 @@ export const companyResponseDto = z.object({
   name: z.string(),
   tradeName: z.string().nullable(),
   cnpj: z.string(),
-  email: z.string(),
+  email: z.string().describe('contato@empresa.com'),
   phone: z.string().nullable(),
   address: z.string().nullable(),
   city: z.string().nullable(),

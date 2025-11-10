@@ -74,98 +74,100 @@ export type QuoteFiltersDTO = z.infer<typeof quoteFiltersSchema>;
 export type UpdateQuoteStatusDTO = z.infer<typeof updateQuoteStatusSchema>;
 export type DuplicateQuoteDTO = z.infer<typeof duplicateQuoteSchema>;
 
-// Interfaces de resposta
-export interface QuoteItemResponseDTO {
-  id: string;
-  productId: string;
-  productName: string;
-  productCode?: string;
-  quantity: number;
-  unitPrice: number;
-  discount: number;
-  discountType: 'PERCENTAGE' | 'FIXED';
-  discountValue: number;
-  subtotal: number;
-  total: number;
-  observations?: string;
-}
+// Schemas de resposta
+export const quoteItemResponseDto = z.object({
+  id: z.string(),
+  productId: z.string(),
+  productName: z.string(),
+  productCode: z.string().optional(),
+  quantity: z.number(),
+  unitPrice: z.number(),
+  discount: z.number(),
+  discountType: z.enum(['PERCENTAGE', 'FIXED']),
+  discountValue: z.number(),
+  subtotal: z.number(),
+  total: z.number(),
+  observations: z.string().optional(),
+});
 
-export interface QuoteResponseDTO {
-  id: string;
-  number: string;
-  customerId: string;
-  customerName: string;
-  customerDocument?: string;
-  title: string;
-  description?: string;
-  status: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CONVERTED';
-  validUntil: Date;
-  paymentTerms?: string;
-  deliveryTerms?: string;
-  observations?: string;
-  discount: number;
-  discountType: 'PERCENTAGE' | 'FIXED';
-  subtotal: number;
-  discountValue: number;
-  totalValue: number;
-  items: QuoteItemResponseDTO[];
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string;
-  createdByName: string;
-}
+export const quoteResponseDto = z.object({
+  id: z.string(),
+  number: z.string(),
+  customerId: z.string(),
+  customerName: z.string(),
+  customerDocument: z.string().optional(),
+  title: z.string(),
+  description: z.string().optional(),
+  status: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'EXPIRED', 'CONVERTED']),
+  validUntil: z.date(),
+  paymentTerms: z.string().optional(),
+  deliveryTerms: z.string().optional(),
+  observations: z.string().optional(),
+  discount: z.number(),
+  discountType: z.enum(['PERCENTAGE', 'FIXED']),
+  subtotal: z.number(),
+  discountValue: z.number(),
+  totalValue: z.number(),
+  items: z.array(quoteItemResponseDto),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  createdBy: z.string(),
+  createdByName: z.string(),
+});
 
-// Interface para estatísticas
-export interface QuoteStatsDTO {
-  total: number;
-  byStatus: {
-    draft: number;
-    sent: number;
-    approved: number;
-    rejected: number;
-    expired: number;
-    converted: number;
-  };
-  totalValue: number;
-  averageValue: number;
-  conversionRate: number;
-  thisMonth: {
-    total: number;
-    totalValue: number;
-    approved: number;
-    approvedValue: number;
-  };
-  lastMonth: {
-    total: number;
-    totalValue: number;
-    approved: number;
-    approvedValue: number;
-  };
-}
+// Schema para estatísticas
+export const quoteStatsDto = z.object({
+  total: z.number(),
+  byStatus: z.object({
+    draft: z.number(),
+    sent: z.number(),
+    approved: z.number(),
+    rejected: z.number(),
+    expired: z.number(),
+    converted: z.number(),
+  }),
+  totalValue: z.number(),
+  averageValue: z.number(),
+  conversionRate: z.number(),
+  thisMonth: z.object({
+    total: z.number(),
+    totalValue: z.number(),
+    approved: z.number(),
+    approvedValue: z.number(),
+  }),
+  lastMonth: z.object({
+    total: z.number(),
+    totalValue: z.number(),
+    approved: z.number(),
+    approvedValue: z.number(),
+  }),
+});
 
-// Interface para relatório
-export interface QuoteReportDTO {
-  id: string;
-  number: string;
-  customerName: string;
-  customerDocument?: string;
-  title: string;
-  status: string;
-  validUntil: string;
-  subtotal: number;
-  discountValue: number;
-  totalValue: number;
-  itemsCount: number;
-  createdAt: string;
-  createdByName: string;
-}
+// Schema para relatório
+export const quoteReportDto = z.object({
+  id: z.string(),
+  number: z.string(),
+  customerName: z.string(),
+  customerDocument: z.string().optional(),
+  title: z.string(),
+  status: z.string(),
+  validUntil: z.string(),
+  subtotal: z.number(),
+  discountValue: z.number(),
+  totalValue: z.number(),
+  itemsCount: z.number(),
+  createdAt: z.string(),
+  createdByName: z.string(),
+});
 
-// Interface para conversão em OS
-export interface ConvertToOrderDTO {
-  orderId: string;
-  orderNumber: string;
-  message: string;
-}
+// Schema para conversão em OS
+export const convertToOrderDto = z.object({
+  orderId: z.string(),
+  orderNumber: z.string(),
+  message: z.string(),
+});
+
+
 
 // Schema para conversão em OS
 export const convertToOrderSchema = z.object({

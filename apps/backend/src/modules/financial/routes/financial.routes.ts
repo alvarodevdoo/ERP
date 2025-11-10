@@ -26,7 +26,7 @@ import {
   transferFiltersSchema
 } from '../dtos';
 import { FinancialService } from '../services';
-import { requirePermission, authMiddleware } from '../../../shared/middlewares/auth';
+import { requirePermission, authPreHandler } from '../../../shared/middlewares/auth';
 import { createValidation } from '../../../shared/middlewares/validation';
 
 import { PrismaClient } from '@prisma/client';

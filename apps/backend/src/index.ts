@@ -17,6 +17,7 @@ const start = async () => {
     if (error instanceof Error) {
       logger.error({ err: error, stack: error.stack }, 'Falha ao iniciar o servidor');
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       logger.error({ err: error as any }, 'Falha ao iniciar o servidor');
     }
     process.exit(1);
