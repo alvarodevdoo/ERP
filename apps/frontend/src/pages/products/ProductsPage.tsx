@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Plus, Search, Edit, Trash2, Package, RefreshCw, FolderTree } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, Package, RefreshCw, FolderTree, FilterX } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/Button'
@@ -61,7 +61,6 @@ export default function ProductsPage() {
   // Buscar produtos
   const fetchProducts = async () => {
     try {
-      setIsLoading(true)
       setError(null)
       const response = await productsService.getAll(filters)
       setProducts(response.data)
@@ -69,21 +68,20 @@ export default function ProductsPage() {
     } catch (err) {
       setError(err as Error)
       toast.error('Erro ao carregar produtos')
-    } finally {
-      setIsLoading(false)
     }
   }
 
   // Buscar categorias
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await categoriesService.getAll()
-        setCategories(response.data)
-      } catch (error) {
-        console.error('Erro ao carregar categorias:', error)
-      }
+  const fetchCategories = async () => {
+    try {
+      const response = await categoriesService.getAll()
+      setCategories(response.data)
+    } catch (error) {
+      console.error('Erro ao carregar categorias:', error)
     }
+  }
+
+  useEffect(() => {
     fetchCategories()
   }, [])
 
@@ -91,6 +89,11 @@ export default function ProductsPage() {
     fetchProducts()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, selectedCategory, selectedStatus, page, itemsPerPage])
+
+  // Carregamento inicial
+  useEffect(() => {
+    setIsLoading(false)
+  }, [])
 
   const refetch = fetchProducts
 
@@ -209,25 +212,6 @@ export default function ProductsPage() {
     }).format(value)
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <p className="text-red-600 mb-2">Erro ao carregar produtos</p>
-          <Button onClick={() => refetch()}>Tentar novamente</Button>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -264,8 +248,8 @@ export default function ProductsPage() {
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="relative">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Buscar por nome ou SKU..."
@@ -275,7 +259,7 @@ export default function ProductsPage() {
               />
             </div>
             
-            <div className="sm:w-48">
+            <div className="flex-1">
               <label htmlFor="category-filter" className="sr-only">Filtrar por Categoria</label>
               <select
                 id="category-filter"
@@ -292,7 +276,7 @@ export default function ProductsPage() {
               </select>
             </div>
 
-            <div className="sm:w-48">
+            <div className="flex-1">
               <label htmlFor="status-filter" className="sr-only">Filtrar por Status</label>
               <select
                 id="status-filter"
@@ -306,19 +290,33 @@ export default function ProductsPage() {
                 <option value="deleted">Excluídos</option>
               </select>
             </div>
+
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleClearFilters}
+              title="Limpar filtros"
+              disabled={!hasActiveFilters}
+            >
+              <FilterX className="h-4 w-4" />
+            </Button>
           </div>
-          {hasActiveFilters && (
-            <div className="mt-4 flex justify-end">
-              <Button variant="outline" size="sm" onClick={handleClearFilters}>
-                Limpar filtros
-              </Button>
-            </div>
-          )}
         </CardContent>
       </Card>
 
       {/* Products Grid */}
-      {formattedProducts.length === 0 ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      ) : error ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-red-600 mb-2">Erro ao carregar produtos</p>
+            <Button onClick={() => refetch()}>Tentar novamente</Button>
+          </div>
+        </div>
+      ) : formattedProducts.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
             <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
@@ -430,7 +428,10 @@ export default function ProductsPage() {
 
       <CategoryModal
         isOpen={isCategoryModalOpen}
-        onClose={() => setIsCategoryModalOpen(false)}
+        onClose={() => {
+          setIsCategoryModalOpen(false)
+          fetchCategories()
+        }}
       />
       
       <ConfirmDialog

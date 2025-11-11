@@ -205,7 +205,7 @@ export function ProductModal({ isOpen, onClose, onSave, product, mode }: Product
                       handleInputChange('stock', 0)
                     }
                   }}
-                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                  className="!h-4 !w-4 !min-h-0 !min-w-0 text-primary focus:ring-primary border-gray-300 rounded cursor-pointer"
                 />
                 <Label htmlFor="trackStock" className="cursor-pointer">Controlar estoque</Label>
               </div>

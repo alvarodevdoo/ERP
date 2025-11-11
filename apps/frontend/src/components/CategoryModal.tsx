@@ -87,7 +87,7 @@ export function CategoryModal({ isOpen, onClose }: CategoryModalProps) {
 
         <div className="space-y-4">
           {/* Formulário */}
-          <form onSubmit={handleSubmit} className="space-y-3 p-4 bg-gray-50 rounded-lg">
+          <form onSubmit={handleSubmit} className="space-y-3 p-4 bg-muted rounded-lg">
             <div className="space-y-2">
               <Label htmlFor="name">Nome *</Label>
               <Input
@@ -122,19 +122,19 @@ export function CategoryModal({ isOpen, onClose }: CategoryModalProps) {
           {/* Lista de Categorias */}
           <div className="space-y-2 max-h-[300px] overflow-y-auto">
             {loading ? (
-              <div className="text-center py-4 text-gray-500">Carregando...</div>
+              <div className="text-center py-4 text-muted-foreground">Carregando...</div>
             ) : categories.length === 0 ? (
-              <div className="text-center py-4 text-gray-500">Nenhuma categoria cadastrada</div>
+              <div className="text-center py-4 text-muted-foreground">Nenhuma categoria cadastrada</div>
             ) : (
               categories.map((category) => (
                 <div
                   key={category.id}
-                  className="flex items-center justify-between p-3 bg-white border rounded-lg hover:bg-gray-50"
+                  className="flex items-center justify-between p-3 bg-card border border-border rounded-lg hover:bg-accent"
                 >
                   <div>
-                    <p className="font-medium">{category.name}</p>
+                    <p className="font-medium text-foreground">{category.name}</p>
                     {category.description && (
-                      <p className="text-sm text-gray-600">{category.description}</p>
+                      <p className="text-sm text-muted-foreground">{category.description}</p>
                     )}
                   </div>
                   <div className="flex gap-1">

@@ -7,7 +7,7 @@ export const createProductDto = z.object({
   name: z.string().min(1, 'Nome é obrigatório').max(255, 'Nome deve ter no máximo 255 caracteres'),
   description: z.string().optional(),
   sku: z.string().min(1, 'SKU é obrigatório').max(100, 'SKU deve ter no máximo 100 caracteres'),
-  categoryId: z.string().uuid('ID da categoria deve ser um UUID válido').nullable().optional(),
+  categoryId: z.string().min(1).nullable().optional(),
   unit: z.string().min(1, 'Unidade de medida é obrigatória').max(10, 'Unidade de medida deve ter no máximo 10 caracteres'),
   costPrice: z.coerce.number().min(0, 'Preço de custo deve ser maior ou igual a zero'),
   salePrice: z.coerce.number().min(0, 'Preço de venda deve ser maior ou igual a zero'),
@@ -49,7 +49,7 @@ export const updateProductDto = createProductDto.partial();
  */
 export const productFiltersDto = z.object({
   search: z.string().optional(),
-  categoryId: z.string().uuid().optional(),
+  categoryId: z.string().min(1).optional(),
   isActive: z.coerce.boolean().optional(),
   isService: z.coerce.boolean().optional(),
   hasVariations: z.coerce.boolean().optional(),

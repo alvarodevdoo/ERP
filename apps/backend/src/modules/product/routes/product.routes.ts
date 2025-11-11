@@ -70,6 +70,7 @@ export async function productRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Querystring: ProductFiltersDto }>, reply: FastifyReply) => {
       try {
         const { companyId, userId } = request;
+        reply.log.info({ query: request.query }, 'Filtros recebidos');
         const result = await productService.findMany(request.query, companyId, userId);
         return reply.send({
           success: true,
@@ -77,6 +78,7 @@ export async function productRoutes(fastify: FastifyInstance) {
           meta: { total: result.total, page: result.page, limit: result.limit, totalPages: result.totalPages }
         });
       } catch (error: unknown) {
+        reply.log.error({ error, query: request.query }, 'Erro ao buscar produtos');
         return handleError(error, reply);
       }
     }

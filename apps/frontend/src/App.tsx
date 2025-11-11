@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/auth'
+import { useTheme } from '@/hooks/useTheme'
 import { useEffect } from 'react'
 
 // Layout Components
@@ -63,6 +64,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   const { initializeAuth } = useAuthStore()
+  useTheme() // Initialize theme
 
   useEffect(() => {
     initializeAuth()
