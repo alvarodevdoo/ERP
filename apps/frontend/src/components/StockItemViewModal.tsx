@@ -1,6 +1,7 @@
 import { X, Package, MapPin, TrendingUp, TrendingDown } from 'lucide-react'
 
 import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
 
 // Interface para item de estoque
 interface StockItem {
@@ -112,9 +113,13 @@ export function StockItemViewModal({ isOpen, onClose, item }: StockItemViewModal
                   <p className={`text-xl font-bold ${stockStatus.color}`}>
                     {item.currentStock} un.
                   </p>
-                  <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${stockStatus.bgColor} ${stockStatus.color}`}>
+                  <Badge
+                    variant={stockStatus.status === 'out' ? 'destructive' : stockStatus.status === 'low' ? 'warning' : 'success'}
+                    tone="solid"
+                    className="text-sm"
+                  >
                     {stockStatus.label}
-                  </span>
+                  </Badge>
                 </div>
               </div>
               

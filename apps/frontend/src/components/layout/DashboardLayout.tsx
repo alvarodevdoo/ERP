@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   Package,
+  Users,
   FileText,
   Wrench,
   Archive,
@@ -28,6 +29,7 @@ interface DashboardLayoutProps {
 const navigation = [
   { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard, current: false },
   { name: 'Produtos', href: '/app/products', icon: Package, current: false },
+  { name: 'Clientes', href: '/app/customers', icon: Users, current: false },
   { name: 'Orçamentos', href: '/app/quotes', icon: FileText, current: false },
   { name: 'Ordens de Serviço', href: '/app/orders', icon: Wrench, current: false },
   { name: 'Estoque', href: '/app/stock', icon: Archive, current: false },

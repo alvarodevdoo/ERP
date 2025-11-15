@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
 import { StockItemModal } from '@/components/StockItemModal'
 import { StockItemViewModal } from '@/components/StockItemViewModal'
 import { StockMovementModal } from '@/components/StockMovementModal'
@@ -499,9 +500,13 @@ export function StockPage() {
                       <div className="flex items-center gap-3 flex-wrap">
                         <h3 className="text-lg font-semibold text-gray-900">{item.productName}</h3>
                         <span className="text-sm text-gray-600">({item.sku})</span>
-                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${stockStatus.bgColor} ${stockStatus.color}`}>
+                        <Badge
+                          variant={stockStatus.status === 'out' ? 'destructive' : stockStatus.status === 'low' ? 'warning' : 'success'}
+                          tone="solid"
+                          className="text-sm"
+                        >
                           {stockStatus.label}
-                        </span>
+                        </Badge>
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">

@@ -18,17 +18,12 @@ export class PartnerRepository {
    */
   async create(data: CreatePartnerDTO, companyId: string): Promise<PartnerResponseDTO> {
     try {
-      // Garantir que documento esteja presente e seja string
-      const doc = data.document ?? '';
-      if (!doc.trim()) {
-        throw new AppError('Documento do parceiro é obrigatório', 400);
-      }
       const createData: Prisma.PartnerCreateInput = {
         name: data.name,
         type: data.type,
-        document: doc, // document é obrigatório no schema
+        phone: data.phone,
+        ...(data.document ? { document: data.document } : {}),
         ...(data.email !== undefined ? { email: data.email } : {}),
-        ...(data.phone !== undefined ? { phone: data.phone } : {}),
         ...(data.notes !== undefined ? { notes: data.notes } : {}),
         company: { connect: { id: companyId } },
         ...(data.address
@@ -44,7 +39,14 @@ export class PartnerRepository {
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
-          throw new AppError('Já existe um parceiro com este documento', 409);
+          const target = (error.meta?.target as string[]) || [];
+          if (target.includes('name')) {
+            throw new AppError('Já existe um parceiro com este nome', 409);
+          }
+          if (target.includes('phone')) {
+            throw new AppError('Já existe um parceiro com este telefone', 409);
+          }
+          throw new AppError('Já existe um parceiro com estes dados', 409);
         }
       }
       throw new AppError('Erro ao criar parceiro', 500);
@@ -82,6 +84,14 @@ export class PartnerRepository {
     try {
       const where: Prisma.PartnerWhereInput = {
         companyId,
+        ...(filters.search && {
+          OR: [
+            { name: { contains: filters.search, mode: 'insensitive' } },
+            { email: { contains: filters.search, mode: 'insensitive' } },
+            { document: { contains: filters.search, mode: 'insensitive' } },
+            { phone: { contains: filters.search, mode: 'insensitive' } }
+          ]
+        }),
         ...(filters.name && {
           name: {
             contains: filters.name,
@@ -140,7 +150,8 @@ export class PartnerRepository {
         limit: filters.limit,
         totalPages: Math.ceil(total / filters.limit)
       };
-    } catch {
+    } catch (error) {
+      console.error('Error in findMany:', error);
       throw new AppError('Erro ao listar parceiros', 500);
     }
   }
@@ -241,6 +252,44 @@ export class PartnerRepository {
         }
       }
       throw new AppError('Erro ao restaurar parceiro', 500);
+    }
+  }
+
+  /**
+   * Verifica se nome já existe
+   */
+  async nameExists(name: string, companyId: string, excludeId?: string): Promise<boolean> {
+    try {
+      const partner = await this.prisma.partner.findFirst({
+        where: {
+          name,
+          companyId,
+          ...(excludeId && { id: { not: excludeId } })
+        }
+      });
+
+      return !!partner;
+    } catch {
+      throw new AppError('Erro ao verificar nome', 500);
+    }
+  }
+
+  /**
+   * Verifica se telefone já existe
+   */
+  async phoneExists(phone: string, companyId: string, excludeId?: string): Promise<boolean> {
+    try {
+      const partner = await this.prisma.partner.findFirst({
+        where: {
+          phone,
+          companyId,
+          ...(excludeId && { id: { not: excludeId } })
+        }
+      });
+
+      return !!partner;
+    } catch {
+      throw new AppError('Erro ao verificar telefone', 500);
     }
   }
 
@@ -441,7 +490,12 @@ export class PartnerRepository {
    * Formata resposta do parceiro
    */
   private formatPartnerResponse(partner: Partner): PartnerResponseDTO {
-    const address = partner.address ? JSON.parse(partner.address as string) : undefined;
+    let address;
+    try {
+      address = partner.address ? JSON.parse(partner.address as string) : undefined;
+    } catch {
+      address = undefined;
+    }
     
     return {
       id: partner.id,

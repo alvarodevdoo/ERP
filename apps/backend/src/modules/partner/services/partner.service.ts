@@ -35,8 +35,20 @@ export class PartnerService {
     // Validações de negócio
     await this.validatePartnerData(data, companyId);
 
-    // Verifica se documento já existe
-    if (data.document) {
+    // Verifica se nome já existe
+    const nameExists = await this.partnerRepository.nameExists(data.name, companyId);
+    if (nameExists) {
+      throw new AppError('Já existe um parceiro com este nome', 409);
+    }
+
+    // Verifica se telefone já existe
+    const phoneExists = await this.partnerRepository.phoneExists(data.phone, companyId);
+    if (phoneExists) {
+      throw new AppError('Já existe um parceiro com este telefone', 409);
+    }
+
+    // Verifica se documento já existe (apenas se não for vazio)
+    if (data.document && data.document.trim() !== '') {
       const documentExists = await this.partnerRepository.documentExists(data.document, companyId);
       if (documentExists) {
         throw new AppError('Já existe um parceiro com este documento', 409);
@@ -110,8 +122,24 @@ export class PartnerService {
       await this.validatePartnerData(data, companyId, id);
     }
 
-    // Verifica se documento já existe (se foi alterado)
-    if (data.document && data.document !== existingPartner.document) {
+    // Verifica se nome já existe (se foi alterado)
+    if (data.name && data.name !== existingPartner.name) {
+      const nameExists = await this.partnerRepository.nameExists(data.name, companyId, id);
+      if (nameExists) {
+        throw new AppError('Já existe um parceiro com este nome', 409);
+      }
+    }
+
+    // Verifica se telefone já existe (se foi alterado)
+    if (data.phone && data.phone !== existingPartner.phone) {
+      const phoneExists = await this.partnerRepository.phoneExists(data.phone, companyId, id);
+      if (phoneExists) {
+        throw new AppError('Já existe um parceiro com este telefone', 409);
+      }
+    }
+
+    // Verifica se documento já existe (se foi alterado e não for vazio)
+    if (data.document && data.document.trim() !== '' && data.document !== existingPartner.document) {
       const documentExists = await this.partnerRepository.documentExists(data.document, companyId, id);
       if (documentExists) {
         throw new AppError('Já existe um parceiro com este documento', 409);

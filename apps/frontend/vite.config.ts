@@ -21,7 +21,13 @@ export default defineConfig({
   },
   server: {
     port: 3060,
-    host: true,
+    host: '0.0.0.0',
+    allowedHosts: ['web.artplim.com.br', 'localhost', '.local'],
+    hmr: {
+      protocol: 'ws',
+      host: 'localhost',
+      port: 3060,
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3050',

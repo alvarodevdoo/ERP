@@ -261,9 +261,9 @@ model Partner {
   id                 String           @id @default(cuid())
   name               String
   type               PartnerType
-  document           String
+  document           String?
   email              String?
-  phone              String?
+  phone              String
   address            String?
   city               String?
   state              String?
@@ -279,7 +279,8 @@ model Partner {
   orders             Order[]
   financialEntries   FinancialEntry[]
 
-  @@unique([document, companyId])
+  @@unique([name, companyId])
+  @@unique([phone, companyId])
   @@map("partners")
 }
 

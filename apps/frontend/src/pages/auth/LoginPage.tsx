@@ -51,8 +51,8 @@ export function LoginPage() {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900">Entrar</h2>
-        <p className="mt-2 text-sm text-gray-600">
+        <h2 className="text-2xl font-bold text-foreground">Entrar</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
           Acesse sua conta para continuar
         </p>
       </div>
@@ -121,9 +121,9 @@ export function LoginPage() {
               id="remember-me"
               name="remember-me"
               type="checkbox"
-              className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+              className="h-4 w-4 !min-h-0 !min-w-0 text-primary focus:ring-primary border-gray-300 rounded"
             />
-            <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+            <label htmlFor="remember-me" className="ml-2 block text-sm text-foreground">
               Lembrar de mim
             </label>
           </div>
@@ -155,7 +155,7 @@ export function LoginPage() {
       </form>
 
       <div className="text-center">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-muted-foreground">
           Não tem uma conta?{' '}
           <Link
             to="/auth/register"

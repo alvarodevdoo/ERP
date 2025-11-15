@@ -42,6 +42,10 @@ async function main() {
     { name: 'Visualizar Produtos', action: 'read', resource: 'products' },
     { name: 'Criar Produtos', action: 'write', resource: 'products' },
     { name: 'Excluir Produtos', action: 'delete', resource: 'products' },
+    { name: 'Visualizar Parceiros', action: 'read', resource: 'partner' },
+    { name: 'Criar Parceiros', action: 'create', resource: 'partner' },
+    { name: 'Atualizar Parceiros', action: 'update', resource: 'partner' },
+    { name: 'Excluir Parceiros', action: 'delete', resource: 'partner' },
     { name: 'Visualizar Orçamentos', action: 'read', resource: 'quotes' },
     { name: 'Criar Orçamentos', action: 'write', resource: 'quotes' },
     { name: 'Excluir Orçamentos', action: 'delete', resource: 'quotes' },
@@ -92,6 +96,7 @@ async function main() {
       (p.resource === 'quotes' && ['read', 'write'].includes(p.action)) ||
       (p.resource === 'orders' && ['read', 'write'].includes(p.action)) ||
       (p.resource === 'products' && p.action === 'read') ||
+      (p.resource === 'partner' && ['read', 'create', 'update'].includes(p.action)) ||
       (p.resource === 'stock' && p.action === 'read')
     )
     .map(p => p.id)
@@ -147,9 +152,10 @@ async function main() {
 
   // Criar parceiros (clientes e fornecedores)
   await prisma.partner.upsert({
-    where: { document_companyId: { document: '123.456.789-00', companyId: company.id } },
+    where: { id: 'partner-joao-silva' },
     update: {},
     create: {
+      id: 'partner-joao-silva',
       name: 'João Silva',
       type: 'CUSTOMER',
       document: '123.456.789-00',
@@ -164,9 +170,10 @@ async function main() {
   })
 
   await prisma.partner.upsert({
-    where: { document_companyId: { document: '98.765.432/0001-10', companyId: company.id } },
+    where: { id: 'partner-madeiras-premium' },
     update: {},
     create: {
+      id: 'partner-madeiras-premium',
       name: 'Madeiras Premium Ltda',
       type: 'SUPPLIER',
       document: '98.765.432/0001-10',

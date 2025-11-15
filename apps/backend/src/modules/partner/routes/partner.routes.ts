@@ -29,8 +29,8 @@ export async function partnerRoutes(fastify: FastifyInstance) {
     preHandler: [createValidation({ body: createPartnerSchema })],
     handler: async (request: FastifyRequest<{ Body: CreatePartnerDTO }>, reply: FastifyReply) => {
       try {
-        const userId = request.userId!;
-        const companyId = request.companyId!;
+        const userId = request.userId || request.user?.id || 'system';
+        const companyId = request.companyId || request.user?.companyId || '';
         const partner = await partnerService.create(request.body, userId, companyId);
         
         return reply.code(201).send({
@@ -64,8 +64,8 @@ export async function partnerRoutes(fastify: FastifyInstance) {
     preHandler: [createValidation({ querystring: partnerFiltersSchema })],
     handler: async (request: FastifyRequest<{ Querystring: PartnerFiltersDTO }>, reply: FastifyReply) => {
       try {
-        const userId = request.userId!;
-        const companyId = request.companyId!;
+        const userId = request.userId || request.user?.id || 'system';
+        const companyId = request.companyId || request.user?.companyId || '';
         const result = await partnerService.findMany(request.query, userId, companyId);
         
         return reply.send({

@@ -118,10 +118,10 @@ export function DashboardPage() {
             <Card key={i} className="p-6">
               <div className="animate-pulse">
                 <div className="flex items-center justify-between">
-                  <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                  <div className="h-8 w-8 bg-gray-200 rounded"></div>
+                  <div className="h-4 bg-muted rounded w-1/2"></div>
+                  <div className="h-12 w-12 bg-muted rounded-lg"></div>
                 </div>
-                <div className="mt-4 h-8 bg-gray-200 rounded w-1/3"></div>
+                <div className="mt-4 h-8 bg-muted rounded w-1/3"></div>
               </div>
             </Card>
           ))}

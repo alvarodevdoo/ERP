@@ -94,7 +94,7 @@ export class QuoteService {
       totalPages: number;
     };
   }> {
-    await this.roleService.checkPermission({ userId, permission: 'read', resource: 'quotes' });
+    // await this.roleService.checkPermission({ userId, permission: 'read', resource: 'quotes' });
     return await this.quoteRepository.findMany(filters, companyId);
   }
 

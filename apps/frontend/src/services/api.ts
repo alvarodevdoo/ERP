@@ -1,9 +1,27 @@
 import axios, { AxiosError, AxiosResponse } from 'axios'
 import { toast } from 'sonner'
 
+// Detectar ambiente e definir baseURL dinamicamente
+const getBaseURL = () => {
+  // Se tiver variável de ambiente configurada, usar ela
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL
+  }
+  
+  // Caso contrário, detectar pelo hostname
+  const hostname = window.location.hostname
+  
+  if (hostname === 'web.artplim.com.br') {
+    return 'https://api.artplim.com.br/api'
+  }
+  
+  // IP da intranet ou localhost
+  return `http://${hostname}:3050/api`
+}
+
 // Create axios instance
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
+  baseURL: getBaseURL(),
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',

@@ -14,7 +14,7 @@ const quoteInclude = {
         product: {
           select: {
             name: true,
-            code: true,
+            sku: true,
           },
         },
       },
@@ -172,6 +172,7 @@ export class QuoteRepository {
         }
       };
     } catch (error) {
+      console.error('Erro detalhado ao listar orçamentos:', error);
       throw new AppError('Erro ao listar orçamentos', 500);
     }
   }
@@ -504,7 +505,7 @@ export class QuoteRepository {
         id: item.id,
         productId: item.productId || '',
         productName: item.product?.name || '',
-        productCode: item.product?.code || '',
+        productCode: item.product?.sku || '',
         quantity: item.quantity.toNumber(),
         unitPrice: item.unitPrice.toNumber(),
         discount: item.discount.toNumber(),

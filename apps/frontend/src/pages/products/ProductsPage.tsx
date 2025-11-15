@@ -3,6 +3,7 @@ import { Plus, Search, Edit, Trash2, Package, RefreshCw, FolderTree, FilterX } f
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { ProductModal } from '@/components/ProductModal'
@@ -217,8 +218,8 @@ export default function ProductsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Produtos</h1>
-          <p className="text-gray-600">Gerencie seu catálogo de produtos</p>
+          <h1 className="text-3xl font-bold text-foreground">Produtos</h1>
+          <p className="text-muted-foreground mt-1">Gerencie seu catálogo de produtos</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
           <Button
@@ -250,7 +251,7 @@ export default function ProductsPage() {
         <CardContent>
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar por nome ou SKU..."
                 className="pl-9"
@@ -265,7 +266,7 @@ export default function ProductsPage() {
                 id="category-filter"
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full px-3 py-2 bg-background text-foreground border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
               >
                 <option value="all">Todas as Categorias</option>
                 {categories.map((category) => (
@@ -282,7 +283,7 @@ export default function ProductsPage() {
                 id="status-filter"
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value as 'all' | 'active' | 'inactive' | 'deleted')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full px-3 py-2 bg-background text-foreground border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
               >
                 <option value="all">Todos</option>
                 <option value="active">Ativo</option>
@@ -312,16 +313,16 @@ export default function ProductsPage() {
       ) : error ? (
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <p className="text-red-600 mb-2">Erro ao carregar produtos</p>
+            <p className="text-destructive mb-2">Erro ao carregar produtos</p>
             <Button onClick={() => refetch()}>Tentar novamente</Button>
           </div>
         </div>
       ) : formattedProducts.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
-            <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum produto encontrado</h3>
-            <p className="text-gray-600">
+            <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-2">Nenhum produto encontrado</h3>
+            <p className="text-muted-foreground">
               {hasActiveFilters 
                 ? 'Tente ajustar os filtros de pesquisa'
                 : 'Comece criando seu primeiro produto'
@@ -342,7 +343,7 @@ export default function ProductsPage() {
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <CardTitle className="text-lg">{prod.name}</CardTitle>
-                    <p className="text-sm text-gray-600 mt-1">{prod.description}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{prod.description}</p>
                   </div>
                   
                   <div className="flex gap-1 ml-2">
@@ -377,35 +378,37 @@ export default function ProductsPage() {
               <CardContent className="pt-0">
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Categoria:</span>
+                    <span className="text-sm text-muted-foreground">Categoria:</span>
                     <span className="text-sm font-medium">
                       {typeof prod.category === 'string' ? prod.category : prod.category.name}
                     </span>
                   </div>
                   
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Preço:</span>
+                    <span className="text-sm text-muted-foreground">Preço:</span>
                     <span className="text-lg font-bold text-primary">
                       {formatCurrency(prod.price)}
                     </span>
                   </div>
                   
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Estoque:</span>
-                    <span className={`text-sm font-medium ${
-                      prod.stock > 10 ? 'text-green-600' : 
-                      prod.stock > 0 ? 'text-yellow-600' : 'text-red-600'
-                    }`}>
-                      {prod.stock} unidades
-                    </span>
-                  </div>
+                  {prod.trackStock && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Estoque:</span>
+                      <span className={`text-sm font-medium ${
+                        prod.stock > 10 ? 'text-green-600' : 
+                        prod.stock > 0 ? 'text-yellow-600' : 'text-red-600'
+                      }`}>
+                        {prod.stock} unidades
+                      </span>
+                    </div>
+                  )}
                   
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Status:</span>
-                    <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                    <span className="text-sm text-muted-foreground">Status:</span>
+                    <span className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
                       prod.isActive
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
+                        ? 'bg-green-500 text-white' 
+                        : 'bg-red-500 text-white'
                     }`}>
                       {prod.isActive ? 'Ativo' : 'Inativo'}
                     </span>

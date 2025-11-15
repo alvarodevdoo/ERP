@@ -15,6 +15,7 @@ import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
 // Dashboard Pages
 import { DashboardPage } from '@/pages/dashboard/DashboardPage'
 import ProductsPage from '@/pages/products/ProductsPage'
+import CustomersPage from '@/pages/customers/CustomersPage'
 import { QuotesPage } from '@/pages/quotes/QuotesPage'
 import { OrdersPage } from '@/pages/orders/OrdersPage'
 import { StockPage } from '@/pages/stock/StockPage'
@@ -101,6 +102,7 @@ function App() {
               <Routes>
                 <Route path="dashboard" element={<DashboardPage />} />
                 <Route path="products" element={<ProductsPage />} />
+                <Route path="customers" element={<CustomersPage />} />
                 <Route path="quotes" element={<QuotesPage />} />
                 <Route path="orders" element={<OrdersPage />} />
                 <Route path="stock" element={<StockPage />} />

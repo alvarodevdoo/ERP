@@ -8,17 +8,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { QuoteModal } from '@/components/QuoteModal'
 import { QuoteViewModal } from '@/components/QuoteViewModal'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-
-interface Quote {
-  id: string
-  number: string
-  client: string
-  description: string
-  value: number
-  status: 'pending' | 'approved' | 'rejected' | 'expired'
-  validUntil: string
-  createdAt: string
-}
+import { quotesService, Quote } from '@/services/quotes'
 
 export function QuotesPage() {
   const [quotes, setQuotes] = useState<Quote[]>([])
@@ -36,82 +26,59 @@ export function QuotesPage() {
   const [actionLoading, setActionLoading] = useState(false)
 
   useEffect(() => {
-    // Simular carregamento de orçamentos
-    const loadQuotes = async () => {
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      const mockQuotes: Quote[] = [
-        {
-          id: '1',
-          number: 'ORC-2024-001',
-          client: 'João Silva',
-          description: 'Orçamento para produtos personalizados de alta qualidade',
-          value: 2500.00,
-          status: 'pending',
-          validUntil: '2024-02-15',
-          createdAt: '2024-01-15'
-        },
-        {
-          id: '2',
-          number: 'ORC-2024-002',
-          client: 'Maria Santos',
-          description: 'Orçamento para linha premium com acabamento especial',
-          value: 4200.00,
-          status: 'approved',
-          validUntil: '2024-02-20',
-          createdAt: '2024-01-18'
-        },
-        {
-          id: '3',
-          number: 'ORC-2024-003',
-          client: 'Pedro Costa',
-          description: 'Orçamento para revenda com desconto por volume',
-          value: 1800.00,
-          status: 'pending',
-          validUntil: '2024-02-25',
-          createdAt: '2024-01-20'
-        }
-      ]
-      
-      setQuotes(mockQuotes)
+    loadQuotes()
+  }, [searchTerm, selectedStatus])
+
+  const loadQuotes = async () => {
+    try {
+      setLoading(true)
+      const response = await quotesService.getAll({
+        search: searchTerm || undefined,
+        status: selectedStatus === 'all' ? undefined : selectedStatus as Quote['status'],
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      })
+      setQuotes(response.data)
+    } catch (error) {
+      console.error('Erro ao carregar orçamentos:', error)
+      toast.error('Erro ao carregar orçamentos')
+    } finally {
       setLoading(false)
     }
+  }
 
-    loadQuotes()
-  }, [])
-
-  const filteredQuotes = quotes.filter(quote => {
-    const matchesSearch = quote.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         quote.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         quote.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = selectedStatus === 'all' || quote.status === selectedStatus
-    return matchesSearch && matchesStatus
-  })
+  const filteredQuotes = quotes
 
   const statusOptions = [
     { value: 'all', label: 'Todos os Status' },
-    { value: 'pending', label: 'Pendente' },
-    { value: 'approved', label: 'Aprovado' },
-    { value: 'rejected', label: 'Rejeitado' },
-    { value: 'expired', label: 'Expirado' }
+    { value: 'DRAFT', label: 'Rascunho' },
+    { value: 'SENT', label: 'Enviado' },
+    { value: 'APPROVED', label: 'Aprovado' },
+    { value: 'REJECTED', label: 'Rejeitado' },
+    { value: 'EXPIRED', label: 'Expirado' },
+    { value: 'CONVERTED', label: 'Convertido' }
   ]
 
   const getStatusColor = (status: Quote['status']) => {
     const colors = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      approved: 'bg-green-100 text-green-800',
-      rejected: 'bg-red-100 text-red-800',
-      expired: 'bg-gray-100 text-gray-800'
+      DRAFT: 'bg-gray-500 text-white',
+      SENT: 'bg-blue-500 text-white',
+      APPROVED: 'bg-green-500 text-white',
+      REJECTED: 'bg-red-500 text-white',
+      EXPIRED: 'bg-orange-500 text-white',
+      CONVERTED: 'bg-purple-500 text-white'
     }
     return colors[status]
   }
 
   const getStatusLabel = (status: Quote['status']) => {
     const labels = {
-      pending: 'Pendente',
-      approved: 'Aprovado',
-      rejected: 'Rejeitado',
-      expired: 'Expirado'
+      DRAFT: 'Rascunho',
+      SENT: 'Enviado',
+      APPROVED: 'Aprovado',
+      REJECTED: 'Rejeitado',
+      EXPIRED: 'Expirado',
+      CONVERTED: 'Convertido'
     }
     return labels[status]
   }
@@ -148,31 +115,21 @@ export function QuotesPage() {
     }
   }
 
-  const handleSaveQuote = async (quoteData: Omit<Quote, 'id' | 'createdAt' | 'number'>) => {
+  const handleSaveQuote = async (quoteData: any) => {
     setActionLoading(true)
     
     try {
-      // Simular delay de API
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
       if (modalMode === 'create') {
-        const newQuote: Quote = {
-          ...quoteData,
-          id: Date.now().toString(),
-          number: `ORC-2024-${String(quotes.length + 1).padStart(3, '0')}`,
-          createdAt: new Date().toISOString().split('T')[0]
-        }
-        setQuotes(prev => [...prev, newQuote])
+        await quotesService.create(quoteData)
         toast.success('Orçamento criado com sucesso!')
-      } else {
-        setQuotes(prev => prev.map(quote => 
-          quote.id === selectedQuote?.id 
-            ? { ...quote, ...quoteData }
-            : quote
-        ))
+      } else if (selectedQuote) {
+        await quotesService.update(selectedQuote.id, quoteData)
         toast.success('Orçamento atualizado com sucesso!')
       }
-    } catch {
+      handleCloseModals()
+      loadQuotes()
+    } catch (error) {
+      console.error('Erro ao salvar orçamento:', error)
       toast.error('Erro ao salvar orçamento')
     } finally {
       setActionLoading(false)
@@ -185,13 +142,12 @@ export function QuotesPage() {
     setActionLoading(true)
     
     try {
-      // Simular delay de API
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      setQuotes(prev => prev.filter(quote => quote.id !== quoteToDelete.id))
+      await quotesService.delete(quoteToDelete.id)
       toast.success('Orçamento excluído com sucesso!')
       handleCloseModals()
-    } catch {
+      loadQuotes()
+    } catch (error) {
+      console.error('Erro ao excluir orçamento:', error)
       toast.error('Erro ao excluir orçamento')
     } finally {
       setActionLoading(false)
@@ -299,12 +255,12 @@ export function QuotesPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-gray-600">Cliente: </span>
-                        <span className="font-medium">{quote.client}</span>
+                        <span className="font-medium">{quote.customerName}</span>
                       </div>
                       <div>
                         <span className="text-gray-600">Valor Total: </span>
                         <span className="font-bold text-primary text-lg">
-                          {formatCurrency(quote.value)}
+                          {formatCurrency(quote.totalValue)}
                         </span>
                       </div>
                       <div className="flex items-center gap-1">

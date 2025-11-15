@@ -6,7 +6,7 @@ const PartnerTypeEnum = z.enum(['CUSTOMER', 'SUPPLIER', 'BOTH']);
 export const createPartnerSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório').max(255, 'Nome deve ter no máximo 255 caracteres'),
   email: z.string().email().optional().describe({ example: 'partner@example.com' } as const),
-  phone: z.string().optional(),
+  phone: z.string().min(1, 'Telefone é obrigatório'),
   document: z.string().optional(),
   type: PartnerTypeEnum,
   notes: z.string().optional(),
@@ -35,7 +35,7 @@ export const createPartnerSchema = z.object({
 export const updatePartnerSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório').max(255, 'Nome deve ter no máximo 255 caracteres').optional(),
   email: z.string().email().optional().describe({ example: 'partner@example.com' } as const),
-  phone: z.string().optional(),
+  phone: z.string().min(1, 'Telefone é obrigatório').optional(),
   document: z.string().optional(),
   type: PartnerTypeEnum.optional(),
   notes: z.string().optional(),
@@ -58,6 +58,7 @@ export const updatePartnerSchema = z.object({
 
 // Schema de validação para filtros de busca
 export const partnerFiltersSchema = z.object({
+  search: z.string().optional(),
   name: z.string().optional(),
   email: z.string().optional().describe({ example: 'partner@example.com' } as const),
   document: z.string().optional(),

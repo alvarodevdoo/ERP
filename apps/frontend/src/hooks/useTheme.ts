@@ -22,9 +22,13 @@ export function useTheme() {
   })
 
   useEffect(() => {
+    // Aplicar tema inicial
     applyTheme(theme)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    // Salvar no localStorage se não existir
+    if (!localStorage.getItem('theme')) {
+      localStorage.setItem('theme', theme)
+    }
+  }, [theme])
 
   useEffect(() => {
     if (theme !== 'system') return
